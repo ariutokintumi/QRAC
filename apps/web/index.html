@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QRAC — QR Accounts</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div class="brand"><b>QRAC</b><span class="muted">Post-quantum authorization for Ethereum accounts</span></div>
+    <div class="row">
+      <span id="netPill" class="pill">Not connected</span>
+      <a class="small" href="test.html" target="_blank">Self-test</a>
+    </div>
+  </header>
+
+  <div class="banner"><b>Developer mode PoC.</b> Your 24 words are stored in this browser's localStorage. Test networks
+    and test funds only. Not audited.</div>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="setup" class="active">1 · Setup</button>
+    <button data-tab="account">2 · Account</button>
+    <button data-tab="compose">3 · Compose &amp; sign</button>
+    <button data-tab="activity">4 · Activity</button>
+    <button data-tab="manage">5 · Manage</button>
+  </nav>
+
+  <!-- ============================== SETUP ============================== -->
+  <div data-panel="setup">
+    <section class="panel">
+      <h2>Post-quantum seed (24 words)</h2>
+      <div id="seedNone">
+        <p class="muted">The seed is independent from any Ethereum wallet: 256 bits of fresh randomness, encoded as 24
+          BIP-39 words. It controls your QRAC accounts. Your gas-paying wallet does not.</p>
+        <div class="row">
+          <button id="btnNewSeed">Create new 24 words</button>
+          <button id="btnShowImport" class="secondary">Import 24 words</button>
+        </div>
+        <div id="newSeedBox" class="hidden">
+          <p><b>Write these words down, in order.</b> Anyone who has them controls your QRAC accounts.</p>
+          <div class="words" id="newWords"></div>
+          <label><input type="checkbox" id="chkWrote"> I wrote down the 24 words</label>
+          <div class="row"><button id="btnSaveSeed" disabled>Use this seed</button></div>
+        </div>
+        <div id="importBox" class="hidden">
+          <label for="importWords">24 words separated by spaces</label>
+          <textarea id="importWords" rows="3" autocomplete="off" spellcheck="false"></textarea>
+          <p class="small muted">Importing words alone does not enable signing for accounts that already have
+            activity: also import your latest journal (Manage tab) so one-time keys are never reused.</p>
+          <div class="row"><button id="btnImportSeed">Import</button></div>
+        </div>
+      </div>
+      <div id="seedSome" class="hidden">
+        <p><span class="pill ok">Seed loaded</span> <span class="muted small">fingerprint</span>
+          <code id="seedFp"></code></p>
+        <div class="row">
+          <button id="btnRevealSeed" class="secondary">Show words</button>
+          <button id="btnForgetSeed" class="danger">Forget seed</button>
+        </div>
+        <div class="words hidden" id="revealWords"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Network and gas-paying wallet</h2>
+      <p class="muted small">This wallet only pays gas and delivers signed instructions. It is not the account owner.</p>
+      <div class="grid">
+        <div>
+          <label for="netMode">Connection</label>
+          <select id="netMode">
+            <option value="injected">Browser wallet (e.g. MetaMask on Sepolia)</option>
+            <option value="local">Local dev node (tools/devnode.py)</option>
+          </select>
+        </div>
+        <div id="localSignerBox" class="hidden">
+          <label for="localSigner">Local test EOA (unlocked)</label>
+          <select id="localSigner"></select>
+        </div>
+      </div>
+      <div class="row"><button id="btnConnect">Connect</button></div>
+      <dl class="kv" id="netInfo"></dl>
+      <h3>Shared verifier (one per chain)</h3>
+      <div class="row">
+        <input id="verifierAddr" placeholder="0x… LMSVerifier address" style="flex:1; min-width:260px">
+        <button id="btnSaveVerifier" class="secondary">Save</button>
+        <button id="btnDeployVerifier" class="secondary">Deploy verifier</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================== ACCOUNT ============================== -->
+  <div data-panel="account" class="hidden">
+    <section class="panel">
+      <h2>QRAC account</h2>
+      <div class="grid">
+        <div>
+          <label for="acctSelect">Local accounts on this chain</label>
+          <select id="acctSelect"></select>
+        </div>
+        <div>
+          <label for="acctIndex">New account number (derivation index)</label>
+          <input id="acctIndex" type="number" min="0" value="0">
+        </div>
+      </div>
+      <div class="row">
+        <button id="btnGenTree">Generate key tree (1,024 one-time keys)</button>
+      </div>
+      <div class="progress hidden" id="treeProgress"><div></div></div>
+      <p class="small muted" id="treeStatus"></p>
+
+      <div id="deployBox" class="hidden">
+        <h3>Deploy or attach</h3>
+        <label>Public key (constructor argument <code>initialPublicKey</code> if you deploy with Remix)</label>
+        <textarea id="pubKeyOut" readonly rows="3"></textarea>
+        <div class="row">
+          <button id="btnDeployAccount">Deploy account with connected wallet</button>
+        </div>
+        <div class="row">
+          <input id="attachAddr" placeholder="0x… account deployed with Remix" style="flex:1; min-width:260px">
+          <button id="btnAttach" class="secondary">Attach</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="dashboard">
+      <h2>Status</h2>
+      <dl class="kv" id="acctInfo"><dt>Account</dt><dd class="muted">none selected</dd></dl>
+      <div class="row">
+        <button id="btnRefresh" class="secondary">Refresh</button>
+        <button id="btnFund" class="secondary">Send 1 ETH to the account from connected wallet</button>
+      </div>
+      <h3>Tokens (manual)</h3>
+      <div class="row">
+        <input id="tokenAddr" placeholder="0x… ERC-20 token address" style="flex:1; min-width:260px">
+        <button id="btnAddToken" class="secondary">Track</button>
+      </div>
+      <div class="table-wrap"><table id="tokenTable"></table></div>
+    </section>
+  </div>
+
+  <!-- ============================== COMPOSE ============================== -->
+  <div data-panel="compose" class="hidden">
+    <section class="panel">
+      <h2>Build an action</h2>
+      <div class="grid">
+        <div>
+          <label for="callType">Call type</label>
+          <select id="callType">
+            <option value="eth">Send ETH</option>
+            <option value="erc20transfer">ERC-20 transfer</option>
+            <option value="erc20approve">ERC-20 approve / revoke (amount 0)</option>
+            <option value="raw">Raw contract call</option>
+          </select>
+        </div>
+        <div data-for="erc20transfer erc20approve"><label for="cToken">Token</label><input id="cToken" placeholder="0x…"></div>
+        <div data-for="raw"><label for="cTarget">Target contract</label><input id="cTarget" placeholder="0x…"></div>
+        <div data-for="eth erc20transfer"><label for="cTo">Recipient</label><input id="cTo" placeholder="0x…"></div>
+        <div data-for="erc20approve"><label for="cSpender">Spender</label><input id="cSpender" placeholder="0x…"></div>
+        <div data-for="eth erc20transfer erc20approve"><label for="cAmount">Amount (in token units, e.g. 1.5)</label><input id="cAmount" placeholder="0.0"></div>
+        <div data-for="raw"><label for="cValue">ETH value</label><input id="cValue" placeholder="0"></div>
+        <div data-for="raw" style="grid-column: 1 / -1"><label for="cData">Calldata (hex)</label><input id="cData" placeholder="0x…"></div>
+        <div data-for="raw"><label><input type="checkbox" id="cCheck"> Require ERC-20 style return (empty or true)</label></div>
+      </div>
+      <div class="row"><button id="btnAddCall" class="secondary">Add to batch</button></div>
+      <h3>Batch (executed in order, all-or-nothing)</h3>
+      <div id="batchList"><p class="muted small">No calls yet.</p></div>
+      <h3>Policy</h3>
+      <div class="grid">
+        <div>
+          <label for="submitPolicy">Who may submit</label>
+          <select id="submitPolicy">
+            <option value="open">Anyone (open)</option>
+            <option value="connected">Only the connected wallet</option>
+            <option value="custom">Only this address…</option>
+          </select>
+        </div>
+        <div><label for="customSubmitter">Allowed submitter</label><input id="customSubmitter" placeholder="0x…" disabled></div>
+        <div><label for="validMinutes">Valid for (minutes, 0 = no expiry)</label><input id="validMinutes" type="number" min="0" value="60"></div>
+      </div>
+      <div class="row"><button id="btnReview">Review</button></div>
+    </section>
+
+    <section class="panel hidden" id="reviewPanel">
+      <h2>Review: exactly what will be signed</h2>
+      <div id="reviewBody"></div>
+      <div class="row">
+        <button id="btnSign">Sign with a one-time key</button>
+        <button id="btnCancelReview" class="secondary">Back</button>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="signedPanel">
+      <h2>Signed authorization</h2>
+      <div id="signedBody"></div>
+      <div class="row">
+        <button id="btnSubmit">Submit with connected wallet</button>
+        <button id="btnExportAuth" class="secondary">Export authorization (for another submitter)</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================== ACTIVITY ============================== -->
+  <div data-panel="activity" class="hidden">
+    <section class="panel">
+      <h2>Activity (this browser's journal)</h2>
+      <p class="muted small">Every one-time key ever reserved is listed, including those whose transaction failed or was
+        never sent: they are spent and will never be reused.</p>
+      <div class="table-wrap"><table id="activityTable"></table></div>
+    </section>
+  </div>
+
+  <!-- ============================== MANAGE ============================== -->
+  <div data-panel="manage" class="hidden">
+    <section class="panel">
+      <h2>Cancel the pending action</h2>
+      <p class="muted small">Signs a CANCEL for the current nonce. Once it lands on-chain, any other signed action for
+        that nonce can never execute. Deleting a local draft is not a cancellation.</p>
+      <div class="row"><button id="btnCancelNonce">Sign cancel for current nonce</button></div>
+    </section>
+    <section class="panel">
+      <h2>Rotate to a new key tree</h2>
+      <p class="muted small">Builds the next tree (epoch + 1) from your seed and authorizes it with the current key.
+        Old-epoch authorizations stop working. The nonce is never reset.</p>
+      <div class="row"><button id="btnRotate">Prepare and sign rotation</button></div>
+      <div class="progress hidden" id="rotProgress"><div></div></div>
+    </section>
+    <section class="panel">
+      <h2>Journal and authorizations</h2>
+      <label><input type="checkbox" id="chkAutoDownload"> Download the journal after every signature</label>
+      <div class="row">
+        <button id="btnDownloadJournal" class="secondary">Download journal</button>
+        <label class="secondary" style="margin:0"><input type="file" id="fileJournal" accept=".json" class="hidden">
+          <span class="pill" style="cursor:pointer">Import journal…</span></label>
+      </div>
+      <label for="authImport">Paste an exported authorization (JSON) to deliver it with the connected wallet</label>
+      <textarea id="authImport" rows="4"></textarea>
+      <div class="row"><button id="btnSubmitImported" class="secondary">Submit pasted authorization</button></div>
+    </section>
+    <section class="panel">
+      <h2>Danger zone</h2>
+      <div class="row"><button id="btnWipe" class="danger">Erase all QRAC data from this browser</button></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </section>
+</main>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

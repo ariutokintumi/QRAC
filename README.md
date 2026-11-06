@@ -44,7 +44,7 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 
 | Phase | What | Status |
 |---|---|---|
-| **1 — MVP** | Shared PQ **verifier** contract · user **account** PoC (single PQ authority, calls and atomic batches, replay protection) · **dApp** in plain HTML/CSS/JS with no backend (signer state in `localStorage` plus a JSON backup download after each signature, developer mode) · tests, gas benchmark, local demo | Verifier ✅ · Account ✅ · dApp in progress |
+| **1 — MVP** | Shared PQ **verifier** contract · user **account** PoC (single PQ authority, calls and atomic batches, replay protection) · **dApp** in plain HTML/CSS/JS with no backend (signer state in `localStorage` plus a JSON backup download after each signature, developer mode) · tests, gas benchmark, local demo | Verifier ✅ · Account ✅ · dApp ✅ (local) · Sepolia run pending |
 | **2 — Mint** | On-chain **factory** so anyone can mint (deploy and initialize atomically) their own QRAC account from the dApp | Planned |
 | **3 — Frame transactions** | Native validation of **EIP-8141 frame transactions** (`VERIFY` frame → `APPROVE`), submitted through the **ERC-8421 alternative mempool** on the hackathon devnet. PQ verification needs more than the public mempool's 100k verification-gas budget, so the alt mempool is what makes it possible. | Planned |
 
@@ -54,7 +54,8 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 |---|---|
 | Post-quantum signature check | ~172k–220k gas · 2,508-byte signature |
 | Full account action (send, token transfer, 5-call batch, cancel, rotate) | ~285k–345k gas per transaction |
-| Tests | 44 passing, incl. RFC 8554 vectors on-chain and a simulated compromise of the deployer's ECDSA key |
+| Browser key generation / signing | 1,024 one-time keys in ~1–2.3 s (Web Worker) · one signature in ~2–15 ms |
+| Tests | 46 Python tests (incl. RFC 8554 vectors on-chain and a simulated compromise of the deployer's ECDSA key) + 10 browser self-test checks + an end-to-end dApp run on the local dev node |
 
 Details and methodology: [vitácora](qrac-ai-handoff/05-VITACORA.md).
 
@@ -63,7 +64,8 @@ Details and methodology: [vitácora](qrac-ai-handoff/05-VITACORA.md).
 ```text
 contracts/          Solidity sources (compile and deploy with Remix)   — Phase 1
 apps/web/           dApp: static HTML + CSS + JS, no build step        — Phase 1
-tools/              Python: local server, reference LMS signer, tests  — Phase 1
+                    (test.html = browser self-test)
+tools/              Python: reference LMS signer, tests, local dev node — Phase 1
 docs/               architecture notes, benchmarks, demo instructions  — as produced
 deployments/        addresses and receipts per chain id                — as produced
 qrac-ai-handoff/    project brief, plan, acceptance criteria, pitch and the decision log (vitácora)
@@ -76,14 +78,28 @@ Requirements: a browser, [Remix IDE](https://remix.ethereum.org), a wallet with 
 **Contracts (Remix, default compiler settings, solc 0.8.24 or later):**
 
 1. Deploy `contracts/LMSVerifier.sol` once per chain. It is shared by every account.
-2. Deploy `contracts/QRACAccount.sol` with `verifier` = the address from step 1 and `initialPublicKey` = your 56-byte LMS public key (the dApp will generate it from your 24 words).
+2. Deploy `contracts/QRACAccount.sol` with `verifier` = the address from step 1 and `initialPublicKey` = your 56-byte LMS public key (the dApp generates it from your 24 words: Account tab → "Generate key tree").
 3. Fund the account by sending ETH or tokens to its address. From then on, only PQ-signed authorizations submitted through `submit()` can move them.
 
-**dApp** *(Phase 1.3, in progress)*: serve it locally (browsers block the key-generation worker on `file://`), then open http://localhost:8080:
+The dApp can also deploy both contracts itself with your connected wallet (Setup → "Deploy verifier", Account → "Deploy account").
+
+**dApp with MetaMask (Sepolia):** serve the folder locally (browsers block the key-generation worker on `file://`), open http://localhost:8080 and choose "Browser wallet":
 
 ```bash
 py -m http.server 8080 --directory apps/web
 ```
+
+Flow: **Setup** (create or import 24 words, connect wallet, set or deploy the verifier) → **Account** (generate key tree, deploy or attach, fund) → **Compose & sign** (ETH / ERC-20 / raw calls, batch, who may submit, validity) → review → sign → submit or export → **Activity** → **Manage** (cancel, rotate, journal download and import).
+
+**Fully local demo, no wallet or testnet needed:** the dev node serves the dApp and a local chain with 10 unlocked test EOAs and the verifier already deployed. Open http://localhost:8545 and choose "Local dev node":
+
+```bash
+.venv\Scripts\python tools/devnode.py
+```
+
+**Browser self-test:** open `/test.html` on either server to check this browser's SHA-256, LMS, BIP-39, key derivation and encoding against the Python references and the official vectors.
+
+> Developer mode: the 24 words are kept in the browser's localStorage. The journal JSON downloaded after each signature contains no secrets but is required, together with the words, to keep signing safely on another browser.
 
 **Tests and gas benchmark** (optional, local in-memory EVM):
 
@@ -97,6 +113,16 @@ py -m venv .venv
 
 ```bash
 .venv\Scripts\python tools/run_tests.py
+```
+
+After changing a contract or a Python reference, regenerate the dApp's compiled artifacts and the self-test fixtures:
+
+```bash
+.venv\Scripts\python tools/build_web_artifacts.py
+```
+
+```bash
+.venv\Scripts\python tools/gen_web_fixtures.py
 ```
 
 Networks: **Sepolia** for Phases 1–2; the hackathon frame-transaction devnet for Phase 3.

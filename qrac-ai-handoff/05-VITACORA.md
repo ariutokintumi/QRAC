@@ -233,3 +233,71 @@ Takeaway: a QRAC action costs about **285k–345k gas**, of which roughly two th
 #### Next
 
 Phase 1.3: the dApp (HTML + CSS + JS, no backend): 24-word seed, key-tree generation in a browser worker, signer journal (localStorage + JSON download after every signature), compose → review → sign → submit through the connected wallet, and account status. The browser signer must reproduce the Python reference and the contract's `authorizationMessage` byte for byte.
+
+### 6 Nov 2026 — Session 1, continued: Phase 1.3 dApp
+
+**General prompt:** build the dApp (HTML + CSS + JS, no backend, developer mode) to create, operate and manage a QRAC account.
+
+#### Decisions
+
+| # | Decision | Status |
+|---|---|---|
+| D-1.31 | **Key derivation v1:** BIP-39 seed (24 words, empty passphrase) → for each `(chainId, accountIndex, epoch)`: `treeSeed = HMAC-SHA256(seed, "QRAC/v1/lms-seed" ‖ 0x00 ‖ u64 chainId ‖ u32 accountIndex ‖ u32 epoch)`, `I = HMAC-SHA256(seed, "QRAC/v1/lms-I" ‖ …)[0:16]`. Every account, chain and epoch gets an independent tree, which implements D-1.30. | Decided · Done |
+| D-1.32 | **Tree height H10 confirmed** (closes O-1.1): the browser builds the 1,024-key tree in about 1–2.3 s in a Web Worker and signs in about 2–15 ms. | Decided |
+| D-1.33 | **Signer journal:** a one-time key is reserved and saved to `localStorage` **before** signing; reserved keys are never released (failed, reverted or never-sent actions included); import merges by taking the higher counter; tabs are serialized with the Web Locks API; the last **8 keys of each tree are reserved for rotation**. Before signing, the dApp also asks the contract whether that key was already used on-chain. | Decided · Done |
+| D-1.34 | **Secrets:** developer mode keeps the 24 words in `localStorage` (warning banner shown). The journal JSON, downloaded after every signature by default, **contains no secrets**; restoring needs the words **and** the latest journal. | Decided · Done |
+| D-1.35 | **Words alone do not allow signing:** when an account with on-chain activity is attached and this browser's journal knows nothing about it, signing is **locked** until a journal is imported. | Decided · Done |
+| D-1.36 | **Exact-intent review:** before signing, the dApp encodes the message locally **and** calls the contract's `authorizationMessage()`; it refuses to sign unless both are byte-identical. Each call is also simulated from the account's address (best effort, shown as such). | Decided · Done |
+| D-1.37 | Gas payment is separate from authority: any connected wallet can submit; an authorization can be **exported as JSON** and delivered by another EOA. A mined revert is explained by re-simulating it. | Decided · Done |
+| D-1.38 | **Two ways to deploy:** from the dApp (it ships the compiled ABI + bytecode in `apps/web/artifacts/`, built by `tools/build_web_artifacts.py`) or with Remix (the dApp shows the 56-byte public key to paste as the constructor argument, then "Attach"). | Decided · Done |
+| D-1.39 | **Local dev node** (`tools/devnode.py`, Python only): serves the dApp and a JSON-RPC endpoint on top of the in-memory EVM, with 10 unlocked test EOAs and the verifier pre-deployed. Gives a full local demo with no MetaMask and no testnet. | Decided · Done |
+| D-1.40 | ethers **v6.13.4** loaded from jsDelivr (pinned, ES module) through a single file (`js/eth.js`); everything else is project code with no build step. | Decided · Done |
+
+#### Evidence
+
+**Browser self-test** (`apps/web/test.html`, run in the Claude desktop built-in browser, Chromium): **10 of 10 checks pass.**
+
+| Check | Result |
+|---|---|
+| JavaScript SHA-256 equals Python and WebCrypto at 16 lengths around block boundaries | Pass |
+| BIP-39: the 8 official 24-word vectors (entropy → words → seed); a wrong word / checksum is rejected | Pass |
+| QRAC key derivation equals the Python reference (4 chain / account / epoch combinations) | Pass |
+| LMS H5/W4: public key and 3 signatures byte-identical to Python; modified signature rejected | Pass |
+| LMS H10/W4 built in a Web Worker equals Python (tree 2.33 s, signature 1.5 ms) | Pass |
+| RFC 8554 Test Case 2 key tree and signature reproduced byte for byte in the browser | Pass |
+| Authorization payload, message and rotation payload byte-identical to Python | Pass |
+
+**End-to-end in the dApp** (built-in browser + local dev node, every step through the UI):
+
+| Scenario | Result |
+|---|---|
+| Create 24 words → connect → build key tree (0.97 s) → deploy account from the dApp → public key verified on-chain → fund 1 ETH | Pass |
+| Send 0.25 ETH: PQ-signed, **delivered by a different EOA (relayer)**, confirmed (333,818 gas) | Pass |
+| Replay of that authorization → refused, `WrongNonce(1, 0)` | Pass |
+| The deployer EOA (treated as compromised) reuses the signature with a payload paying itself → refused (`LeafAlreadyUsed`); balance unchanged | Pass |
+| Restricted submitter: refused from the deployer EOA (`SubmitterNotAllowed`), confirmed from the named fresh EOA | Pass |
+| A signed-but-unsent send, then a CANCEL for the same nonce: cancel confirmed, the send can no longer land | Pass |
+| Rotation to epoch 1 through the UI; the next send uses key #0 of the new tree | Pass |
+| ERC-20 batch (transfer 12.5, approve 100, revoke) in one PQ-signed transaction; review decodes each call (335,457 gas) | Pass |
+| "New browser" with the words but no journal → signing **locked**; after importing the journal it unlocks at epoch 1, next key #1 | Pass |
+| Exported journal (45 KB, 6 entries) contains neither the words nor the seed | Pass |
+
+Python suite after this phase: **46 tests, all passing** (adds BIP-39 official vectors and derivation independence).
+
+#### Not yet verified
+
+- **MetaMask on Sepolia:** not exercised yet. The code path is the standard ethers `BrowserProvider`; it needs a manual run by the team with Sepolia ETH.
+- **Automatic journal download** after each signature: implemented; the browser download itself was switched off during automated testing.
+
+#### Files produced
+
+- `apps/web/index.html`, `css/styles.css`, `js/app.js`: the dApp (Setup, Account, Compose & sign, Activity, Manage).
+- `apps/web/js/sha256.js`, `lms.js`, `lms-worker.js`, `bip39.js`, `derive.js`, `encoding.js`, `journal.js`, `eth.js`: browser crypto, encoding and signer journal.
+- `apps/web/test.html`, `js/selftest.js`, `test/fixtures.json`: browser self-test.
+- `apps/web/assets/bip39-english.txt` (official list, SHA-256 `2f5eed53…dbda`), `apps/web/artifacts/*.json`.
+- `tools/qrac/derive.py`, `tools/gen_web_fixtures.py`, `tools/build_web_artifacts.py`, `tools/devnode.py`, `tools/tests/test_derive.py`, `tools/vectors/bip39.json`.
+- `.claude/launch.json`: preview configurations (static server and dev node).
+
+#### Next
+
+Manual Sepolia run with MetaMask (deploy verifier and account, then send, batch and rotate), record the addresses and transaction hashes under `deployments/11155111/`. Then Phase 2: factory / mint.

@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "qrac-web-static",
+      "runtimeExecutable": "py",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8080",
+        "--directory",
+        "apps/web"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "qrac-devnode",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "tools/devnode.py",
+        "--port",
+        "8545"
+      ],
+      "port": 8545
+    }
+  ]
+}
