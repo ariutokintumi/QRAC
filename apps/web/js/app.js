@@ -524,6 +524,9 @@ async function refresh() {
     <dt>Public key matches seed</dt><dd>${pkOk ? '<span class="pill ok">yes</span>' : '<span class="pill bad">NO</span>'}</dd>
     <dt>Signing</dt><dd>${a.locked ? `<span class="pill bad">locked</span> ${esc(a.locked)}` : '<span class="pill ok">available</span>'}</dd>
     <dt>Verifier</dt><dd>${addrLink(verifier)}</dd>`;
+  // step 2 showed this line before the account existed; keep it current once it is on chain
+  $('predictedAddr').innerHTML = `${addrLink(a.address)} <span class="pill ok">on chain</span>
+    <span class="small muted">· balance ${E.formatEther(bal)} ETH</span>`;
   await renderTokens(a);
 }
 $('btnRefresh').onclick = () => guard('Refresh', refresh);

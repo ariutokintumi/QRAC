@@ -574,3 +574,14 @@ Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.p
 | Frame transactions admitted by the gateway but never mined (status "New"; the miner sidecar did not know the hash) | **Theirs:** gossip from the gateway to the miner stalled that evening | Yes (feedback item 5) |
 | After the fix, the browser still sent only to the gateway | **Ours:** a cached `deployments.json` without the miner endpoint (see D-5.4) | No |
 | User mode did not move to the next step after an action | **Ours:** the view skipped redrawing while busy | No |
+
+### 7 Nov 2026: Session 1, continued: final review, local and on qrac.me
+
+**General prompt:** before recording the demo, test everything end to end locally and then on the public site, in User mode and in Dev mode.
+
+| # | Decision | Status |
+|---|---|---|
+| D-5.6 | **Public site:** https://qrac.me serves the `apps/web` folder as is (Caddy, HTTPS, http redirects to https). Checked: every file byte-identical to the repo, correct content types (the JavaScript modules and the Web Worker load), self-test 11/11 on the domain, both pages in both modes, and the devnet endpoints (execution RPC, miner sidecar, gateway with the faucet) reachable from the qrac.me origin. Transactions on the public domain are left to the team's own run, which is the demo. | Done · Verified |
+| D-5.7 | Two Dev mode display fixes found in the review: the frame page now refreshes the setup key balance and the block number after each action (before, only on load), and the Sepolia page's "Your account address" line shows the account as on chain once it exists (it kept the text from before the mint). | Done · Verified locally |
+
+**Local run** (fresh browser storage): frame tab in User mode (key, faucet, create, send mined in block 9498, stake) and in Dev mode (sign, public mempool rejected, alternative mempool admitted 17/17, mined in block 9528); Sepolia tab with the local dev node in place of the wallet, in User mode (create, fund, send) and in Dev mode (review identical to the contract, sign, submit). Each mode showed the other's transactions. 101 Python tests OK. Sepolia and devnet contracts still live, and the submission transaction is still on chain (block 8082).

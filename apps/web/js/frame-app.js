@@ -114,9 +114,11 @@ async function renderSeed() {
   $('seedInfo').innerHTML = `<dt>24-word seed</dt><dd><span class="pill ok">loaded</span> fingerprint <code>${E.keccak256(S.seed64).slice(0, 18)}</code> (shared with the Sepolia page; trees on chain 1337 are independent)</dd>`;
 }
 
-async function renderBurner() {
-  const k = localStorage.getItem(BURNER_KEY);
-  S.burner = k ? new E.Wallet(k, S.provider) : null;
+async function renderBurner(reload = true) {
+  if (reload) {
+    const k = localStorage.getItem(BURNER_KEY);
+    S.burner = k ? new E.Wallet(k, S.provider) : null;
+  }
   if (!S.burner) { $('burnerInfo').innerHTML = '<dt>Setup key</dt><dd class="muted">none yet</dd>'; return; }
   const bal = await S.provider.getBalance(S.burner.address);
   $('burnerInfo').innerHTML = `<dt>Setup key (devnet only)</dt><dd><code>${S.burner.address}</code> · ${E.formatEther(bal)} ETH</dd>`;
@@ -189,6 +191,9 @@ async function treeFor(idx) {
 $('btnFTree').onclick = () => guard('Key generation', () => treeFor(Number($('fIndex').value || 0)));
 
 async function refresh() {
+  // keep the header block and the setup key balance current too (they used to update only on load and faucet)
+  rpc(S.D.executionRpc, 'eth_blockNumber').then((b) => { $('netPill').textContent = `devnet chain ${Number(CHAIN)} · block ${parseInt(b, 16)}`; }).catch(() => {});
+  renderBurner(false).catch(() => {});
   const a = currentAccount();
   if (!a) { $('fAcct').innerHTML = '<dt>Account</dt><dd class="muted">generate the key tree first</dd>'; renderActivity(); return; }
   const pk = a.trees[0].publicKey;
