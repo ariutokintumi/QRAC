@@ -24,3 +24,6 @@ contracts/.states/
 Thumbs.db
 .vscode/
 .idea/
+
+# Phase 3 devnet state (throwaway devnet key, QRAC devnet LMS seed, journal)
+.devnet/

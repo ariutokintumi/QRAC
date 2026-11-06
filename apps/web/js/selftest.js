@@ -110,6 +110,23 @@ async function run() {
     `${getBytes(msg).length} bytes`);
   report('Rotation payload identical to Python', rotatePayload(fx.lms_small.publicKey, 3) === a.rotatePayload);
 
+  // EIP-8141 frame transaction codec
+  const ftx = await import('./frametx.js');
+  const w = fx.frametx.tx;
+  const jsTx = {
+    chainId: BigInt(w.chainId), sender: w.sender, nonceKeys: w.nonceKeys.map(BigInt), nonceSeq: BigInt(w.nonceSeq),
+    frames: w.frames.map((f) => ({ mode: f.mode, flags: f.flags, target: f.target, execution: BigInt(f.limits.execution),
+      state: BigInt(f.limits.state), value: BigInt(f.value), data: f.data })),
+    signatures: w.signatures, maxPriorityFeePerGas: BigInt(w.fees.maxPriorityFeePerGas),
+    maxFeePerGas: BigInt(w.fees.maxFeePerGas), maxFeePerBlobGas: BigInt(w.fees.maxFeePerBlobGas),
+  };
+  const nk = fx.frametx.nonceKey;
+  report('Frame transaction (EIP-8141) raw bytes, signature hash, tx hash and JSON identical to Python',
+    ftx.raw(jsTx) === fx.frametx.raw && ftx.sigHash(jsTx) === fx.frametx.sigHash && ftx.txHash(jsTx) === fx.frametx.txHash
+      && JSON.stringify(ftx.wire(jsTx)) === JSON.stringify(w)
+      && ftx.frameNonceKey(nk.epoch, nk.leaf).toString() === nk.key,
+    `${getBytes(fx.frametx.raw).length} bytes`);
+
   summary.textContent = failed === 0 ? `All ${passed} checks passed` : `${failed} of ${passed + failed} checks FAILED`;
   summary.className = 'pill ' + (failed === 0 ? 'ok' : 'bad');
   window.QRAC_SELFTEST = { passed, failed };

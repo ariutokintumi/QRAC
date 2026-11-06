@@ -46,7 +46,7 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 |---|---|---|
 | **1 — MVP** | Shared PQ **verifier** contract · user **account** PoC (single PQ authority, calls and atomic batches, replay protection) · **dApp** in plain HTML/CSS/JS with no backend (signer state in `localStorage` plus a JSON backup download after each signature, developer mode) · tests, gas benchmark, local demo | ✅ Done: local and **on Sepolia** ([PQ-signed transfer](https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c), [records](deployments/11155111.md)) |
 | **2 — Mint** | On-chain **factory** so anyone can mint (deploy and initialize atomically) their own QRAC account from the dApp: a 45-byte clone of shared logic, address known before minting | ✅ Done: local and **on Sepolia**, creating an account is ≈ 14× cheaper ([records](deployments/11155111.md)) |
-| **3 — Frame transactions** | Native validation of **EIP-8141 frame transactions** (`VERIFY` frame → `APPROVE`), submitted through the **ERC-8421 alternative mempool** on the hackathon devnet. PQ verification needs more than the public mempool's 100k verification-gas budget, so the alt mempool is what makes it possible. | Planned |
+| **3 — Frame transactions** | Native validation of **EIP-8141 frame transactions** (`VERIFY` frame → `APPROVE`): zero ECDSA in the transaction, the account pays its own gas, one-time keys enforced by EIP-8250 keyed nonces. The ~250k-gas PQ check is **rejected by the public mempool (100k)** and **admitted by the ERC-8421 alternative mempool**. | ✅ Done on the devnet ([admitted tx](https://explorer.altmempool.wtf/tx/0x2f414a944f74a803e5d3e59eb98e9bd56f2c0a6e87be9bcf5cfa42e65026f4f0), [records](deployments/1337.md)) |
 
 ### Measured so far (local EVM, LMS H10/W4)
 
@@ -56,14 +56,15 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 | Full account action (send, token transfer, 5-call batch, cancel, rotate) | ~285k–345k gas per transaction |
 | Browser key generation / signing | 1,024 one-time keys in ~1–2.3 s (Web Worker) · one signature in ~2–15 ms |
 | Creating an account (Sepolia) | standalone 10.5M gas → **minted 738k gas (≈ 14× cheaper)** · local: 1.61M → 168k |
-| Tests | 77 Python tests (incl. RFC 8554 vectors on-chain, a simulated compromise of the deployer's ECDSA key, and every account test repeated on minted clones) + 10 browser self-test checks + end-to-end dApp runs |
+| Frame-transaction devnet | PQ frame tx admitted by the alt mempool (17/17 checks) and mined; rejected by the public mempool; VERIFY ~250k gas |
+| Tests | 101 Python tests (incl. RFC 8554 vectors on-chain, a simulated compromise of the deployer's ECDSA key, and every account test repeated on minted clones) + 11 browser self-test checks + end-to-end dApp runs |
 
 Details and methodology: [vitácora](qrac-ai-handoff/05-VITACORA.md).
 
 ## Repository layout
 
 ```text
-contracts/          Solidity sources (compile and deploy with Remix)   — Phase 1
+contracts/          Solidity sources (compile and deploy with Remix)   — Phases 1–3 (vendor/: HegotaSupport, MIT)
 apps/web/           dApp: static HTML + CSS + JS, no build step        — Phase 1
                     (test.html = browser self-test)
 tools/              Python: reference LMS signer, tests, local dev node — Phase 1
@@ -103,6 +104,14 @@ Flow: **Setup** (create a seed, which downloads a secret seed file, or import on
 ```bash
 .venv\Scripts\python tools/devnode.py
 ```
+
+**Frame transactions (EIP-8141, alt-mempool devnet):** open `frame.html` (or click "Future Ethereum" at the top of the dApp). It uses the same seed, creates a throwaway devnet setup key funded by the devnet faucet, mints, funds and stakes the account, then signs post-quantum frame transactions and shows the public mempool rejecting them and the alternative mempool admitting them. The same flow from the command line:
+
+```bash
+.venv\Scripts\python tools/devnet.py init
+```
+
+then `fund`, `deploy` (once per devnet), `mint`, `send --route canonical`, `send`, `stake`, `attacks`, `status`.
 
 **Browser self-test:** open `/test.html` on either server to check this browser's SHA-256, LMS, BIP-39, key derivation and encoding against the Python references and the official vectors.
 

@@ -1,0 +1,141 @@
+{
+ "contractName": "QRACFrameFactory",
+ "compiler": {
+  "solc": "0.8.28",
+  "evmVersion": "cancun",
+  "optimizer": {
+   "enabled": true,
+   "runs": 200
+  }
+ },
+ "abi": [
+  {
+   "inputs": [
+    {
+     "internalType": "address",
+     "name": "implementation_",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "nonpayable",
+   "type": "constructor"
+  },
+  {
+   "inputs": [
+    {
+     "internalType": "address",
+     "name": "account",
+     "type": "address"
+    }
+   ],
+   "name": "AlreadyMinted",
+   "type": "error"
+  },
+  {
+   "inputs": [],
+   "name": "CloneFailed",
+   "type": "error"
+  },
+  {
+   "inputs": [],
+   "name": "NoImplementationCode",
+   "type": "error"
+  },
+  {
+   "anonymous": false,
+   "inputs": [
+    {
+     "indexed": true,
+     "internalType": "address",
+     "name": "account",
+     "type": "address"
+    },
+    {
+     "indexed": true,
+     "internalType": "bytes32",
+     "name": "keyFingerprint",
+     "type": "bytes32"
+    },
+    {
+     "indexed": true,
+     "internalType": "address",
+     "name": "minter",
+     "type": "address"
+    }
+   ],
+   "name": "AccountMinted",
+   "type": "event"
+  },
+  {
+   "inputs": [],
+   "name": "implementation",
+   "outputs": [
+    {
+     "internalType": "address",
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view",
+   "type": "function"
+  },
+  {
+   "inputs": [
+    {
+     "internalType": "bytes",
+     "name": "publicKey",
+     "type": "bytes"
+    }
+   ],
+   "name": "isMinted",
+   "outputs": [
+    {
+     "internalType": "bool",
+     "name": "",
+     "type": "bool"
+    }
+   ],
+   "stateMutability": "view",
+   "type": "function"
+  },
+  {
+   "inputs": [
+    {
+     "internalType": "bytes",
+     "name": "publicKey",
+     "type": "bytes"
+    }
+   ],
+   "name": "mint",
+   "outputs": [
+    {
+     "internalType": "address",
+     "name": "account",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "nonpayable",
+   "type": "function"
+  },
+  {
+   "inputs": [
+    {
+     "internalType": "bytes",
+     "name": "publicKey",
+     "type": "bytes"
+    }
+   ],
+   "name": "predictAddress",
+   "outputs": [
+    {
+     "internalType": "address",
+     "name": "",
+     "type": "address"
+    }
+   ],
+   "stateMutability": "view",
+   "type": "function"
+  }
+ ],
+ "bytecode": "0x60a060405234801561000f575f5ffd5b506040516104d23803806104d283398101604081905261002e91610069565b806001600160a01b03163b5f0361005857604051634db7213b60e01b815260040160405180910390fd5b6001600160a01b0316608052610096565b5f60208284031215610079575f5ffd5b81516001600160a01b038116811461008f575f5ffd5b9392505050565b6080516104176100bb5f395f8181605301528181610141015261022901526104175ff3fe608060405234801561000f575f5ffd5b506004361061004a575f3560e01c80635c60da1b1461004e5780637ba0e2e7146100925780638effb3c7146100a5578063b29ebe05146100c8575b5f5ffd5b6100757f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020015b60405180910390f35b6100756100a0366004610336565b6100db565b6100b86100b3366004610336565b610203565b6040519015158152602001610089565b6100756100d6366004610336565b610223565b5f5f83836040516100ed9291906103a4565b604051809103902090505f6101028585610223565b90506001600160a01b0381163b1561013c5760405163449e62bb60e11b81526001600160a01b038216600482015260240160405180910390fd5b6101667f0000000000000000000000000000000000000000000000000000000000000000836102cb565b60405163439fab9160e01b81529093506001600160a01b0384169063439fab919061019790889088906004016103b3565b5f604051808303815f87803b1580156101ae575f5ffd5b505af11580156101c0573d5f5f3e3d5ffd5b50506040513392508491506001600160a01b038616907ffc481947558f4a984510cccbbe255a3939cebc7b3e1c1ca962b7901e6bb1c127905f90a4505092915050565b5f61020e8383610223565b6001600160a01b03163b151590505b92915050565b5f6102c47f000000000000000000000000000000000000000000000000000000000000000084846040516102589291906103a4565b6040519081900381203060388301526f5af43d82803e903d91602b57fd5bf3ff60248301526014820192909252733d602d80600a3d3981f3363d3d373d3d3d363d73815260588101919091526037600c820120607882015260556043909101206001600160a01b031690565b9392505050565b5f763d602d80600a3d3981f3363d3d373d3d3d363d730000008360601b60e81c175f526e5af43d82803e903d91602b57fd5bf38360781b1760205281603760095ff590506001600160a01b03811661021d576040516342bcb05b60e11b815260040160405180910390fd5b5f5f60208385031215610347575f5ffd5b823567ffffffffffffffff81111561035d575f5ffd5b8301601f8101851361036d575f5ffd5b803567ffffffffffffffff811115610383575f5ffd5b856020828401011115610394575f5ffd5b6020919091019590945092505050565b818382375f9101908152919050565b60208152816020820152818360408301375f818301604090810191909152601f909201601f1916010191905056fea2646970667358221220984d871e50b38a438cca2adb768ce3118c315d7dafea97c2fea3ac0272f642c564736f6c634300081c0033"
+}

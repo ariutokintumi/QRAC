@@ -18,9 +18,12 @@ OUT_DIR = os.path.join(HERE, "..", "apps", "web", "artifacts")
 
 
 def main():
-    compiled = compile_contracts("LMSVerifier.sol", "QRACAccount.sol", "QRACFactory.sol")
+    v = "vendor/hegota-support/"
+    compiled = compile_contracts("LMSVerifier.sol", "QRACAccount.sol", "QRACFactory.sol", "QRACFrameAccount.sol",
+                                 "QRACFrameFactory.sol", v + "HegotaSupport.sol", v + "Devnet.sol", v + "Opcode.sol",
+                                 v + "Params.sol", v + "internal/HelperCalls.sol", v + "generated/HelperCode.sol")
     os.makedirs(OUT_DIR, exist_ok=True)
-    for name in ("LMSVerifier", "QRACAccount", "QRACFactory"):
+    for name in ("LMSVerifier", "QRACAccount", "QRACFactory", "QRACFrameAccount", "QRACFrameFactory"):
         c = compiled[name]
         out = {
             "contractName": name,

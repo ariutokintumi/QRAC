@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QRAC — EIP-8141 frame transactions</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div class="brand"><b>QRAC</b><span class="muted">Post-quantum authorization for Ethereum accounts</span></div>
+    <div class="row">
+      <span id="netPill" class="pill">devnet: checking…</span>
+      <a class="small" href="test.html" target="_blank">Self-test</a>
+    </div>
+  </header>
+
+  <nav class="modes">
+    <a href="index.html">Current Ethereum · Sepolia</a>
+    <a href="frame.html" class="active">Future Ethereum · EIP-8141 frame transactions (devnet)</a>
+  </nav>
+
+  <div class="banner"><b>Frame-transaction devnet (chain 1337).</b> EIP-8141 is not live on Ethereum yet: this runs on
+    the public alt-mempool devnet, which may be reset. Developer mode: test values only.</div>
+
+  <section class="panel">
+    <h2>Same account idea, no compromises</h2>
+    <div class="table-wrap"><table>
+      <tr><th></th><th>Current Ethereum (Sepolia)</th><th>Frame transactions (this page)</th></tr>
+      <tr><td>Who signs the transaction</td><td>An ECDSA wallet delivers it; the account checks the PQ signature inside</td><td><b>Only the PQ signature.</b> The transaction carries no ECDSA signature at all</td></tr>
+      <tr><td>Who pays the gas</td><td>An ECDSA wallet</td><td><b>The account itself</b> (it approves execution and payment)</td></tr>
+      <tr><td>Replay / one-time keys</td><td>Account storage + signer journal</td><td><b>The protocol</b> (each one-time key is an EIP-8250 nonce key)</td></tr>
+      <tr><td>Mempool</td><td>Public mempool</td><td><b>Alternative mempool (ERC-8421)</b>: the ~250k-gas PQ check is too big for the public one (100k)</td></tr>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <h2>1 · Seed and setup wallet</h2>
+    <dl class="kv" id="seedInfo"><dt>24-word seed</dt><dd class="muted">checking…</dd></dl>
+    <p class="small muted">Setup only (mint, fund, stake) needs a devnet gas payer. This page creates a throwaway devnet key
+      in your browser and funds it from the devnet faucet. It never gets any right over your account.</p>
+    <dl class="kv" id="burnerInfo"></dl>
+    <div class="row">
+      <button id="btnBurner" class="secondary">Create devnet setup key</button>
+      <button id="btnFaucet" class="secondary">Get devnet ETH (faucet)</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>2 · Your frame account</h2>
+    <div class="grid">
+      <div><label for="fIndex">Account number (derivation index on chain 1337)</label><input id="fIndex" type="number" min="0" value="0"></div>
+    </div>
+    <div class="row"><button id="btnFTree">Generate key tree</button></div>
+    <div class="progress hidden" id="fProgress"><div></div></div>
+    <dl class="kv" id="fAcct"></dl>
+    <div class="row">
+      <button id="btnFMint" class="secondary">Mint account (setup key pays)</button>
+      <input id="fFund" value="0.05" style="width:100px" aria-label="ETH to fund">
+      <button id="btnFFund" class="secondary">Fund account</button>
+      <button id="btnFStake" class="secondary">Stake 0.012 ETH (PQ-signed, via submit())</button>
+      <button id="btnFRefresh" class="secondary">Refresh</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>3 · Send a post-quantum frame transaction</h2>
+    <div class="grid">
+      <div><label for="fTo">Recipient</label><input id="fTo" value="0x8943545177806ED17B9F23F0a21ee5948eCaa776"></div>
+      <div><label for="fAmount">Amount (ETH)</label><input id="fAmount" value="0.000001"></div>
+    </div>
+    <div class="row"><button id="btnFSign">Sign with a one-time key and simulate</button></div>
+    <div id="fSim"></div>
+    <div class="row hidden" id="fSubmitRow">
+      <button id="btnFAlt">Submit to the alternative mempool (ERC-8421)</button>
+      <button id="btnFCanon" class="secondary">Try the public (canonical) mempool</button>
+    </div>
+    <div id="fResult"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Activity (this browser's journal, chain 1337)</h2>
+    <div class="table-wrap"><table id="fActivity"></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </section>
+</main>
+<script type="module" src="js/frame-app.js"></script>
+</body>
+</html>

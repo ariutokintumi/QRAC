@@ -1,5 +1,5 @@
 {
- "note": "Known shared deployments. The dApp pre-fills the verifier and factory for the connected chain from here. Evidence: deployments/11155111.md",
+ "note": "Known shared deployments per chain. The dApp pre-fills them. Evidence: deployments/<chainId>.md",
  "11155111": {
   "network": "Sepolia",
   "verifier": "0x64791efC129BA3cc1FD75562Eeefe3fCDb3d3bfC",
@@ -7,5 +7,16 @@
   "factory": "0xdD419ceF48230FF2694827Be8FF704ee2927960f",
   "factoryDeployTx": "0xba940d157e9f166ef009027f114960d1f88c659be722573a906c8819c4dd3991",
   "implementation": "0xfc9e6012776876E7D8874f070f4d55818A920B87"
+ },
+ "1337": {
+  "network": "EIP-8141 frame-transaction devnet (alt mempool)",
+  "verifier": "0xD628ab4cac92e56e983978ac789b41d9B81D1568",
+  "frameImplementation": "0xE646CA52ba78c58179f47C1afFdeB2CF7d688F58",
+  "frameFactory": "0x78eE7702554D4ca8De003E234296E0d574Bf95c5",
+  "executionRpc": "https://altmempool.forshtat.com",
+  "altMempoolRpc": "https://altmempoolgateway.forshtat.com/rpc",
+  "explorer": "https://explorer.altmempool.wtf/tx/",
+  "stakingRegistry": "0xd51c04d7a0b01124e84de152f4e56d9eecb22d2f",
+  "note": "Throwaway devnet: may be reset. Evidence: deployments/1337.md"
  }
 }

@@ -64,7 +64,11 @@ COMPILED = None
 def compiled():
     global COMPILED
     if COMPILED is None:
-        COMPILED = compile_contracts("LMSVerifier.sol", "QRACAccount.sol", "QRACFactory.sol", "test/Mocks.sol")
+        V = "vendor/hegota-support/"
+        COMPILED = compile_contracts("LMSVerifier.sol", "QRACAccount.sol", "QRACFactory.sol", "test/Mocks.sol",
+                                     "QRACFrameAccount.sol", "QRACFrameFactory.sol", V + "HegotaSupport.sol",
+                                     V + "Devnet.sol", V + "Opcode.sol", V + "Params.sol", V + "internal/HelperCalls.sol",
+                                     V + "generated/HelperCode.sol")
     return COMPILED
 
 
@@ -116,6 +120,12 @@ class AccountTestBase(unittest.TestCase):
         self.verifier = self.chain.deploy(c["LMSVerifier"]["bin"], sender=self.deployer)
         if self.MODE == "clone":
             self.factory = self.chain.deploy(c["QRACFactory"]["bin"], ["address"], [self.verifier], sender=self.deployer)
+        if self.MODE == "frame":
+            # Phase 3: locked QRACFrameAccount implementation + QRACFrameFactory (its legacy submit() path must behave
+            # exactly like QRACAccount; the frame-transaction path itself is tested on the devnet: tools/devnet.py)
+            impl = self.chain.deploy(c["QRACFrameAccount"]["bin"], ["address", "bytes"], [self.verifier, b""],
+                                     sender=self.deployer)
+            self.factory = self.chain.deploy(c["QRACFrameFactory"]["bin"], ["address"], [impl], sender=self.deployer)
         self.signer = Signer(new_key(1))
         self.account = self.deploy_account(self.signer.key.public_key())
         # Fund the account from the (compromised) deployer EOA.
@@ -125,7 +135,7 @@ class AccountTestBase(unittest.TestCase):
     # --- helpers ---------------------------------------------------------------------------
 
     def deploy_account(self, public_key: bytes) -> str:
-        if self.MODE == "clone" and not self.is_minted(public_key):
+        if self.MODE in ("clone", "frame") and not self.is_minted(public_key):
             return self.mint(public_key)
         # Standalone deployment. In clone mode this is only used to create a SECOND account with the same key
         # (one key -> one minted address), purely to test cross-account message binding.
@@ -439,7 +449,7 @@ class Lifecycle(AccountTestBase):
         for bad in (pk[:-1], pk + b"\x00", b"\x00\x00\x00\x0a" + pk[4:], pk[:4] + b"\x00\x00\x00\x09" + pk[8:]):
             with self.assertRaises(Exception):
                 self.deploy_account(bad)
-            if self.MODE == "clone":
+            if self.MODE in ("clone", "frame"):
                 # the failed mint leaves nothing behind at the predicted address
                 self.assertEqual(self.chain.t.get_code(self.predict(bad)), "0x")
 
@@ -525,6 +535,8 @@ class Execution(AccountTestBase):
 # Every behaviour test above, run again against accounts MINTED by QRACFactory (ERC-1167 clones).
 for _cls in (Encoding, Authority, SubmissionPolicy, Lifecycle, Execution):
     globals()[_cls.__name__ + "ViaFactory"] = type(_cls.__name__ + "ViaFactory", (_cls,), {"MODE": "clone"})
+    # ... and against Phase 3 QRACFrameAccount clones (legacy submit() path)
+    globals()[_cls.__name__ + "FrameAccount"] = type(_cls.__name__ + "FrameAccount", (_cls,), {"MODE": "frame"})
 del _cls
 
 

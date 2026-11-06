@@ -90,6 +90,19 @@ def main():
         "rotatePayload": h(auth.rotate_payload(small.public_key(), 3)),
     }
 
+    # EIP-8141 frame transaction (devnet codec, see tools/qrac/frametx.py)
+    from qrac import frametx as ftx
+    sender = "0x3E29c3258546e9Ff6de5ca999AfAF81563edB0eb"
+    tx = ftx.FrameTx(
+        chain_id=1337, sender=sender, nonce_keys=[(3 << 32 | 77) + 1], nonce_seq=0,
+        frames=[ftx.Frame(ftx.MODE_VERIFY, ftx.SCOPE_EXECUTION_AND_PAYMENT, sender, 320_000, 0, 0, bytes.fromhex("7bd3edd6")),
+                ftx.Frame(ftx.MODE_SENDER, 0, "0x8943545177806ED17B9F23F0a21ee5948eCaa776", 60_000, 200_000, 10**12),
+                ftx.Frame(ftx.MODE_SENDER, ftx.FLAG_ATOMIC_BATCH, None, 0, 0, 0, b"")],
+        signatures=[ftx.Signature(ftx.SCHEME_ARBITRARY, b"", b"", bytes(range(256)) * 10)],
+        max_priority_fee_per_gas=2 * 10**9, max_fee_per_gas=2 * 10**9)
+    fx["frametx"] = {"tx": tx.wire(), "raw": h(tx.raw()), "sigHash": h(tx.sig_hash()), "txHash": h(tx.tx_hash()),
+                     "nonceKey": {"epoch": 3, "leaf": 77, "key": str((3 << 32 | 77) + 1)}}
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(fx, f, indent=1)

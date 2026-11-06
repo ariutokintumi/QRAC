@@ -466,3 +466,46 @@ Team: on Sepolia, Setup → "Deploy factory" (one time), then mint an account an
 
 - **OK to use the devnet's published shared genesis key once**, only to fund a fresh QRAC devnet key (exactly what the workshop's step 1 does). It holds worthless devnet ETH; it is never used for staking and never on a real network.
 - Optional, on site: confirm with the alt-mempool team (Pierre, Alex) that a sender whose VERIFY frame uses `delegatecall` (clone + helpers) and a 2.5 KB ARBITRARY signature is in scope, and whether the devnet will be reset during the hackathon.
+
+### 7 Nov 2026 — Session 1, continued: Phase 3 built and proven on the frame-transaction devnet
+
+**General prompt:** fund a devnet key and build Phase 3, kept separate from the current version: the dApp starts with a choice between "Current Ethereum (Sepolia)" and "EIP-8141 frame transactions (devnet)", so the jury can see both the solution for today (with its tradeoffs) and the one for tomorrow. Nothing from Phases 1–2 may break.
+
+#### Decisions
+
+| # | Decision | Status |
+|---|---|---|
+| D-3.7 | **Separation:** new contracts `QRACFrameAccount` (inherits `QRACAccount` unchanged + vendored `HegotaSupport`, MIT) and `QRACFrameFactory`; new page `frame.html` + `js/frame-app.js` + `js/frametx.js`; both pages carry a mode switch. `QRACAccount.sol`, `QRACFactory.sol`, the Sepolia artifacts (byte-identical) and the Sepolia flow are unchanged. | Decided · Done |
+| D-3.8 | **Funding:** the devnet gateway's faucet (`skandha_explorer_faucet`, 1 ETH, once per hour per address). The published shared genesis key was **not** needed. | Done |
+| D-3.9 | **Implementation deployed in its own transaction** (15.15M gas, under the per-transaction cap); the frame factory takes its address. | Done |
+| D-3.10 | VERIFY frame gas limit 320k (measured use ~247k–255k). | Done |
+| D-3.11 | Frame page setup transactions (mint, fund, stake relay) use a throwaway **setup key created in the browser** and funded by the faucet; it never has rights over the account. These transactions are signed locally and sent raw with our own receipt polling (ethers mis-reported a mined funding as failed on this node). | Decided · Done |
+| D-3.12 | Before signing, the dApp checks **both** one-time-key guards on-chain: legacy `isLeafUsed(epoch, leaf)` and the EIP-8250 NONCE_MANAGER sequence of the leaf's nonce key. | Decided · Done |
+
+#### Evidence
+
+| Check | Result |
+|---|---|
+| Python codec vs devnet: an EOA frame tx signed over our signature hash is accepted, and the sidecar returns exactly our transaction hash (mined, block 8052) | Pass |
+| VERIFY through clone → implementation → `APPROVE` helper (the open question of the research) | Works (simulation and mined transactions) |
+| PQ frame tx on the **public (canonical) mempool** | **Rejected** (validation prefix > 100,000 gas) |
+| Same PQ frame tx on the **alternative mempool** | **Admitted (17/17 checks), mined**: script blocks 8070 / 8082 / 8090, browser blocks 8182 / 8195 |
+| Explorer (prize qualification link) | [`0x2f414a94…6f4f0`](https://explorer.altmempool.wtf/tx/0x2f414a944f74a803e5d3e59eb98e9bd56f2c0a6e87be9bcf5cfa42e65026f4f0): "On chain · Admission report: Every rule passed"; browser run: [`0x55fd6e70…f5e117`](https://explorer.altmempool.wtf/tx/0x55fd6e70a036206a0329527e8e0c552eba28d2747c1bc033e18f5d9096f5e117) |
+| Account stakes itself through the Phase 1 `submit()` path (script and browser) | Registry: 0.012 ETH, 86,400 s |
+| Live attacks (`tools/devnet.py attacks`): replay (stopped by the **protocol** keyed nonce), tamper after signing (`BadFrameSignature`), wrong nonce key (`WrongNonceKey`), ECDSA-only drain attempt (`FrameSignatureNotArbitrary`) | All rejected |
+| Local suite: every account behaviour test also runs on `QRACFrameAccount` clones (legacy path identical) | **101 tests passing** |
+| Browser self-test: JS frame codec byte-identical to Python | **11/11 checks passing** |
+
+Gas on the devnet: LMS verify 182k–209k; VERIFY frame ~247k–255k; whole PQ frame tx (VERIFY + transfer, with the 2.5 KB signature) 304k–326k.
+
+**Honest note on staking:** the latest ERC-8421 draft caps unstaked entities at 100k verification gas, but the devnet's sidecar follows an earlier draft (`validationGasLimit` 10,000,000) and also admitted our unstaked account. The decisive difference on this devnet is **public mempool: rejected → alternative mempool: admitted**. We stake anyway, so the account also satisfies the ERC as currently written.
+
+Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.py` (init, fund, probe, deploy, mint, send, stake, attacks, status), `tools/qrac/frametx.py`, `tools/devnet_verify_bench.py`.
+
+#### Phase status
+
+| Phase | Status |
+|---|---|
+| 1 — MVP | ✅ local + Sepolia |
+| 2 — Mint | ✅ local + Sepolia |
+| 3 — EIP-8141 + ERC-8421 | ✅ devnet (scripts and browser): admitted and mined transactions with explorer links |
