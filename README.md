@@ -67,7 +67,7 @@ apps/web/           dApp: static HTML + CSS + JS, no build step        — Phase
                     (test.html = browser self-test)
 tools/              Python: reference LMS signer, tests, local dev node — Phase 1
 docs/               architecture notes, benchmarks, demo instructions  — as produced
-deployments/        addresses and receipts per chain id                — as produced
+deployments/        deployment records per chain id (Sepolia: 11155111.md)
 qrac-ai-handoff/    project brief, plan, acceptance criteria, pitch and the decision log (vitácora)
 ```
 
@@ -83,13 +83,18 @@ Requirements: a browser, [Remix IDE](https://remix.ethereum.org), a wallet with 
 
 The dApp can also deploy both contracts itself with your connected wallet (Setup → "Deploy verifier", Account → "Deploy account").
 
-**dApp with MetaMask (Sepolia):** serve the folder locally (browsers block the key-generation worker on `file://`), open http://localhost:8080 and choose "Browser wallet":
+**dApp with a browser wallet (MetaMask, Brave Wallet…) on Sepolia:** the dApp must be served over `http://localhost` (browsers block the key-generation worker on `file://`). Any of these works, they serve the same files:
+
+- `http://localhost:8080` after running the static server below, or
+- `http://localhost:8545` while the local dev node (next section) is running.
 
 ```bash
 py -m http.server 8080 --directory apps/web
 ```
 
-Flow: **Setup** (create or import 24 words, connect wallet, set or deploy the verifier) → **Account** (generate key tree, deploy or attach, fund) → **Compose & sign** (ETH / ERC-20 / raw calls, batch, who may submit, validity) → review → sign → submit or export → **Activity** → **Manage** (cancel, rotate, journal download and import).
+Choose "Browser wallet" and connect. On Sepolia the shared verifier is already deployed and pre-filled: [`0x64791efC…3d3bfC`](deployments/11155111.md).
+
+Flow: **Setup** (create a seed, which downloads a secret seed file, or import one; connect the wallet; the verifier is pre-filled or can be deployed) → **Account** (generate key tree, deploy or attach, fund) → **Compose & sign** (ETH / ERC-20 / raw calls, batch, who may submit, validity) → review → sign → submit or export → **Activity** → **Manage** (cancel, rotate, journal download and import).
 
 **Fully local demo, no wallet or testnet needed:** the dev node serves the dApp and a local chain with 10 unlocked test EOAs and the verifier already deployed. Open http://localhost:8545 and choose "Local dev node":
 
@@ -99,7 +104,7 @@ Flow: **Setup** (create or import 24 words, connect wallet, set or deploy the ve
 
 **Browser self-test:** open `/test.html` on either server to check this browser's SHA-256, LMS, BIP-39, key derivation and encoding against the Python references and the official vectors.
 
-> Developer mode: the 24 words are kept in the browser's localStorage. The journal JSON downloaded after each signature contains no secrets but is required, together with the words, to keep signing safely on another browser.
+> Developer mode: the 24 words are kept in the browser's localStorage and in the downloaded seed file (keep it secret). The journal JSON downloaded after each signature contains no secrets but is required, together with the seed file, to keep signing safely on another browser.
 
 **Tests and gas benchmark** (optional, local in-memory EVM):
 

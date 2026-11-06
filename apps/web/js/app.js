@@ -85,7 +85,7 @@ function accountContract(address, runner) {
   return new E.Contract(address, S.art.QRACAccount.abi, runner || S.provider);
 }
 function requireConnected() {
-  if (!S.provider) throw new Error('connect a network first (Setup tab)');
+  if (!S.provider || !S.chainId) throw new Error('connect a network first (Setup tab → Connect)');
 }
 function requireSeed() {
   if (!S.bip39Seed) throw new Error('load or create your 24-word seed first (Setup tab)');
@@ -126,31 +126,54 @@ async function loadSeed(m) {
   $('seedSome').classList.remove('hidden');
 }
 
-$('btnNewSeed').onclick = () => {
-  const m = generateMnemonic(S.words);
-  $('newSeedBox').dataset.m = m;
-  renderWords($('newWords'), m);
-  $('newSeedBox').classList.remove('hidden');
-  $('importBox').classList.add('hidden');
-};
-$('chkWrote').onchange = (e) => { $('btnSaveSeed').disabled = !e.target.checked; };
-$('btnSaveSeed').onclick = () => guard('Saving seed', async () => {
-  const m = $('newSeedBox').dataset.m;
-  J.saveMnemonic(m);
-  await loadSeed(m);
-  log('New 24-word seed created and stored (developer mode: localStorage).');
-});
-$('btnShowImport').onclick = () => {
-  $('importBox').classList.remove('hidden');
-  $('newSeedBox').classList.add('hidden');
-};
-$('btnImportSeed').onclick = () => guard('Import', async () => {
-  const m = normalizeMnemonic($('importWords').value);
+function downloadSeedFile() {
+  const fp = $('seedFp').textContent;
+  const out = {
+    qrac: 'seed-v1',
+    warning: 'SECRET. Whoever has this file controls the QRAC accounts derived from it. Test networks only.',
+    mnemonic: S.mnemonic,
+    words: 24,
+    bip39Passphrase: '',
+    fingerprint: fp,
+    createdAt: new Date().toISOString(),
+  };
+  J.downloadBlob(new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' }), `qrac-seed-${fp.slice(2, 10)}.json`);
+}
+
+async function useSeed(m, how) {
+  m = normalizeMnemonic(m);
   mnemonicToEntropy(m, S.words); // validates count, words and checksum
   J.saveMnemonic(m);
-  $('importWords').value = '';
   await loadSeed(m);
-  log('Seed imported. For accounts with past activity, also import your latest journal before signing.');
+  log(`${how}. Stored in this browser (developer mode).`);
+}
+
+$('btnNewSeed').onclick = () => guard('Create seed', async () => {
+  if (S.mnemonic && !confirm('Replace the current seed in this browser?')) return;
+  await useSeed(generateMnemonic(S.words), 'New 24-word seed created');
+  downloadSeedFile();
+  log('Seed file downloaded (keep it secret; you need it to restore).');
+});
+$('btnDownloadSeed').onclick = () => downloadSeedFile();
+$('btnShowImport').onclick = () => $('importBox').classList.toggle('hidden');
+$('btnImportSeed').onclick = () => guard('Import', async () => {
+  await useSeed($('importWords').value, 'Seed imported from typed words');
+  $('importWords').value = '';
+  log('For accounts with past activity, also import your latest journal before signing.');
+});
+$('fileSeed').onchange = (ev) => guard('Import seed file', async () => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const text = (await f.text()).trim();
+  let m = text;
+  if (text.startsWith('{')) {
+    const data = JSON.parse(text);
+    if (data.qrac !== 'seed-v1' || !data.mnemonic) throw new Error('not a QRAC seed file');
+    m = data.mnemonic;
+  }
+  ev.target.value = '';
+  await useSeed(m, `Seed imported from ${f.name}`);
+  log('For accounts with past activity, also import your latest journal before signing.');
 });
 $('btnRevealSeed').onclick = () => {
   const el = $('revealWords');
@@ -169,15 +192,32 @@ $('btnForgetSeed').onclick = () => {
 
 $('netMode').onchange = () => $('localSignerBox').classList.toggle('hidden', $('netMode').value !== 'local');
 
+/** Wallet events are a convenience only. Some wallets (e.g. Brave) expose a locked Proxy whose
+ *  `on` property throws when read, so failures here must never break the connection. */
+let walletEventsHooked = false;
+function subscribeWalletEvents() {
+  if (walletEventsHooked) return;
+  walletEventsHooked = true;
+  try {
+    const eth = window.ethereum;
+    const on = eth && typeof eth.on === 'function' ? eth.on.bind(eth) : null;
+    if (!on) return;
+    on('chainChanged', () => location.reload());
+    on('accountsChanged', () => connect().catch((e) => log(explain(e))));
+  } catch (e) {
+    log('Wallet change events unavailable in this wallet (switching account or network needs a manual "Connect").');
+  }
+}
+
 async function connect() {
+  S.chainId = null; // only set once the connection fully succeeded
   S.mode = $('netMode').value;
   if (S.mode === 'injected') {
     if (!window.ethereum) throw new Error('no browser wallet found (install MetaMask or use the local dev node)');
     S.provider = new E.BrowserProvider(window.ethereum);
     await S.provider.send('eth_requestAccounts', []);
     S.signer = await S.provider.getSigner();
-    window.ethereum.on?.('chainChanged', () => location.reload());
-    window.ethereum.on?.('accountsChanged', () => connect().catch((e) => log(explain(e))));
+    subscribeWalletEvents();
   } else {
     S.provider = new E.JsonRpcProvider(location.origin + '/rpc', undefined, { batchMaxCount: 1 });
     const info = await S.provider.send('qrac_devInfo', []);
@@ -196,6 +236,11 @@ async function connect() {
   }
   S.submitter = await S.signer.getAddress();
   S.chainId = (await S.provider.getNetwork()).chainId.toString();
+  const known = S.known?.[S.chainId]?.verifier;
+  if (known && !S.settings.verifiers?.[S.chainId]) {
+    S.settings.verifiers = { ...(S.settings.verifiers || {}), [S.chainId]: known };
+    J.saveSettings(S.settings);
+  }
   const bal = await S.provider.getBalance(S.submitter);
   $('netPill').textContent = `chain ${S.chainId} · ${short(S.submitter)}`;
   $('netPill').className = 'pill ok';
@@ -393,7 +438,8 @@ async function refresh() {
 $('btnRefresh').onclick = () => guard('Refresh', refresh);
 $('btnFund').onclick = () => guard('Funding', async () => {
   const a = requireAttached();
-  const tx = await S.signer.sendTransaction({ to: a.address, value: E.parseEther('1') });
+  const amount = $('fundAmount').value.trim() || '0';
+  const tx = await S.signer.sendTransaction({ to: a.address, value: E.parseEther(amount) });
   log(`Funding tx ${tx.hash}`);
   await tx.wait();
   await refresh();
@@ -721,17 +767,21 @@ async function renderActivity() {
 // ---------------------------------------------------------------------------------------------
 
 (async () => {
-  const [w, v, acc] = await Promise.all([
+  const [w, v, acc, known] = await Promise.all([
     loadWordlist(),
     fetch('artifacts/LMSVerifier.json').then((r) => r.json()),
     fetch('artifacts/QRACAccount.json').then((r) => r.json()),
+    fetch('deployments.json').then((r) => r.json()).catch(() => ({})),
   ]);
+  S.known = known;
+  // drop a verifier saved under an unknown chain by the earlier connect bug
+  if (S.settings.verifiers?.null) { delete S.settings.verifiers.null; J.saveSettings(S.settings); }
   S.words = w;
   S.art = { LMSVerifier: v, QRACAccount: acc };
   S.accountIface = new E.Interface(acc.abi);
   const m = J.loadMnemonic();
   if (m) await loadSeed(m);
-  if (location.port === '8545') {
+  if (location.port === '8545' && !window.ethereum) {
     $('netMode').value = 'local';
     $('localSignerBox').classList.remove('hidden');
   }

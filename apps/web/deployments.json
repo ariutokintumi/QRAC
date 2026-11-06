@@ -1,0 +1,8 @@
+{
+ "note": "Known shared deployments. The dApp pre-fills the verifier for the connected chain from here. Evidence: deployments/11155111.md",
+ "11155111": {
+  "network": "Sepolia",
+  "verifier": "0x64791efC129BA3cc1FD75562Eeefe3fCDb3d3bfC",
+  "verifierDeployTx": "0x372db5fdfd552f3c0d7e5ba7765eb53c3e11f53228ab57826e2c3b7d25f09ab5"
+ }
+}

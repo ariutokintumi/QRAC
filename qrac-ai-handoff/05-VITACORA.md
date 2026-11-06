@@ -301,3 +301,26 @@ Python suite after this phase: **46 tests, all passing** (adds BIP-39 official v
 #### Next
 
 Manual Sepolia run with MetaMask (deploy verifier and account, then send, batch and rotate), record the addresses and transaction hashes under `deployments/11155111/`. Then Phase 2: factory / mint.
+
+### 7 Nov 2026 — Session 1, continued: first Sepolia run, fixes
+
+**General prompt:** the team ran the dApp against Sepolia with Brave Wallet; report and fix what blocked the run, and make seed handling practical for hackathon tooling.
+
+#### Outcome of the run
+
+- The **shared verifier was deployed to Sepolia** from the dApp: `0x64791efC129BA3cc1FD75562Eeefe3fCDb3d3bfC` ([details and checks](../deployments/11155111.md)). Independent checks: the deployed code is byte-identical to the tested build, and an `eth_call` of `verify()` on Sepolia accepts the RFC 8554 Test Case 2 signature and rejects a tampered one.
+- The run then stopped: "Connect failed" followed by "Cannot convert null to a BigInt" on key generation.
+
+#### Root cause and fixes
+
+| # | Finding / decision | Status |
+|---|---|---|
+| F-1 | **Bug:** Brave Wallet exposes `window.ethereum` as a locked Proxy; reading its `on` property throws. The dApp subscribed to wallet events right after connecting, so the error aborted the connection **before the chain ID was stored**. The deploy button still worked (signer already set), but key generation then failed. **Fix:** wallet event subscription is best effort and isolated; the chain ID is stored only when the connection completes, and every action checks it. Reproduced in the test browser with a Proxy built the same way, then verified: connect, key tree, deploy, fund, PQ-signed send all succeed. | Fixed · Verified |
+| D-1.41 | **Seed handling made practical (hackathon tooling):** creating a seed no longer asks the user to write words down. It is saved immediately and a **seed file** (`qrac-seed-<fingerprint>.json`, marked SECRET) is downloaded. The Setup tab can download it again and import it back (the 24 words are validated, checksum included). Restoring in another browser needs the seed file **and** the latest journal. Supersedes the "write down the words" step of D-0.4's UX; entropy and format are unchanged. | Decided · Done · Verified (round trip, corrupted file refused) |
+| D-1.42 | **Known deployments file:** `apps/web/deployments.json` lists shared contracts per chain; the dApp pre-fills the verifier for the connected chain (Sepolia → the address above). Human-readable records live in `deployments/<chainId>.md`. | Decided · Done |
+| D-1.43 | Funding button takes an amount (default 0.02 ETH) instead of a fixed 1 ETH. | Done |
+| D-1.44 | **Which local address to use:** `http://localhost:8545` is the dev node (dApp + local chain) and `http://localhost:8080` exists only when `py -m http.server 8080 --directory apps/web` is running. Both serve the **same dApp files**; with a browser wallet either works for Sepolia. On port 8545 the dApp now defaults to "Local dev node" only when no browser wallet is present. | Clarified · Done |
+
+#### Measurement from Sepolia
+
+Contract creation is far more expensive on Sepolia today than on the local Cancun-rules chain: the verifier used **3,978,048 gas** (580k locally), and a `QRACAccount` deployment is estimated at **10.6M gas** (1.54M locally). A full verification as a transaction is estimated at 259,739 gas. This strengthens the case for Phase 2's minimal-proxy factory.

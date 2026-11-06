@@ -36,14 +36,10 @@
         <p class="muted">The seed is independent from any Ethereum wallet: 256 bits of fresh randomness, encoded as 24
           BIP-39 words. It controls your QRAC accounts. Your gas-paying wallet does not.</p>
         <div class="row">
-          <button id="btnNewSeed">Create new 24 words</button>
-          <button id="btnShowImport" class="secondary">Import 24 words</button>
-        </div>
-        <div id="newSeedBox" class="hidden">
-          <p><b>Write these words down, in order.</b> Anyone who has them controls your QRAC accounts.</p>
-          <div class="words" id="newWords"></div>
-          <label><input type="checkbox" id="chkWrote"> I wrote down the 24 words</label>
-          <div class="row"><button id="btnSaveSeed" disabled>Use this seed</button></div>
+          <button id="btnNewSeed">Create new seed (downloads a seed file)</button>
+          <button id="btnShowImport" class="secondary">Type / paste 24 words</button>
+          <label style="margin:0"><input type="file" id="fileSeed" accept=".json,.txt" class="hidden">
+            <span class="pill" style="cursor:pointer">Import seed file…</span></label>
         </div>
         <div id="importBox" class="hidden">
           <label for="importWords">24 words separated by spaces</label>
@@ -57,9 +53,12 @@
         <p><span class="pill ok">Seed loaded</span> <span class="muted small">fingerprint</span>
           <code id="seedFp"></code></p>
         <div class="row">
+          <button id="btnDownloadSeed" class="secondary">Download seed file (JSON)</button>
           <button id="btnRevealSeed" class="secondary">Show words</button>
           <button id="btnForgetSeed" class="danger">Forget seed</button>
         </div>
+        <p class="small muted">The seed file is SECRET (whoever has it controls your QRAC accounts). To continue in
+          another browser you need the seed file <b>and</b> the latest journal (Manage tab).</p>
         <div class="words hidden" id="revealWords"></div>
       </div>
     </section>
@@ -130,7 +129,8 @@
       <dl class="kv" id="acctInfo"><dt>Account</dt><dd class="muted">none selected</dd></dl>
       <div class="row">
         <button id="btnRefresh" class="secondary">Refresh</button>
-        <button id="btnFund" class="secondary">Send 1 ETH to the account from connected wallet</button>
+        <input id="fundAmount" value="0.02" style="width:110px" aria-label="ETH amount to fund">
+        <button id="btnFund" class="secondary">Fund the account with this ETH from the connected wallet</button>
       </div>
       <h3>Tokens (manual)</h3>
       <div class="row">
