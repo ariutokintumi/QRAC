@@ -45,7 +45,7 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 | Phase | What | Status |
 |---|---|---|
 | **1 — MVP** | Shared PQ **verifier** contract · user **account** PoC (single PQ authority, calls and atomic batches, replay protection) · **dApp** in plain HTML/CSS/JS with no backend (signer state in `localStorage` plus a JSON backup download after each signature, developer mode) · tests, gas benchmark, local demo | ✅ Done: local and **on Sepolia** ([PQ-signed transfer](https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c), [records](deployments/11155111.md)) |
-| **2 — Mint** | On-chain **factory** so anyone can mint (deploy and initialize atomically) their own QRAC account from the dApp: a 45-byte clone of shared logic, address known before minting | ✅ Done locally (mint ≈ 9.6× cheaper) · Sepolia run pending |
+| **2 — Mint** | On-chain **factory** so anyone can mint (deploy and initialize atomically) their own QRAC account from the dApp: a 45-byte clone of shared logic, address known before minting | ✅ Done: local and **on Sepolia**, creating an account is ≈ 14× cheaper ([records](deployments/11155111.md)) |
 | **3 — Frame transactions** | Native validation of **EIP-8141 frame transactions** (`VERIFY` frame → `APPROVE`), submitted through the **ERC-8421 alternative mempool** on the hackathon devnet. PQ verification needs more than the public mempool's 100k verification-gas budget, so the alt mempool is what makes it possible. | Planned |
 
 ### Measured so far (local EVM, LMS H10/W4)
@@ -55,7 +55,7 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 | Post-quantum signature check | ~172k–220k gas · 2,508-byte signature |
 | Full account action (send, token transfer, 5-call batch, cancel, rotate) | ~285k–345k gas per transaction |
 | Browser key generation / signing | 1,024 one-time keys in ~1–2.3 s (Web Worker) · one signature in ~2–15 ms |
-| Creating an account | standalone 1.61M gas → **minted 168k gas** (local); Sepolia standalone 10.5M, Sepolia mint pending |
+| Creating an account (Sepolia) | standalone 10.5M gas → **minted 738k gas (≈ 14× cheaper)** · local: 1.61M → 168k |
 | Tests | 77 Python tests (incl. RFC 8554 vectors on-chain, a simulated compromise of the deployer's ECDSA key, and every account test repeated on minted clones) + 10 browser self-test checks + end-to-end dApp runs |
 
 Details and methodology: [vitácora](qrac-ai-handoff/05-VITACORA.md).
@@ -94,9 +94,9 @@ The dApp does all of this with your connected wallet (Setup → "Deploy verifier
 py -m http.server 8080 --directory apps/web
 ```
 
-Choose "Browser wallet" and connect. On Sepolia the shared verifier is already deployed and pre-filled: [`0x64791efC…3d3bfC`](deployments/11155111.md).
+Choose "Browser wallet" and connect. On Sepolia the shared verifier and factory are already deployed and pre-filled ([addresses](deployments/11155111.md)).
 
-Flow: **Setup** (create a seed, which downloads a secret seed file, or import one; connect the wallet; the verifier is pre-filled or can be deployed) → **Account** (generate key tree, deploy or attach, fund) → **Compose & sign** (ETH / ERC-20 / raw calls, batch, who may submit, validity) → review → sign → submit or export → **Activity** → **Manage** (cancel, rotate, journal download and import).
+Flow: **Setup** (create a seed, which downloads a secret seed file, or import one; connect the wallet; verifier and factory are pre-filled or can be deployed) → **Account** (generate key tree, see your address, mint, fund) → **Compose & sign** (ETH / ERC-20 / raw calls, batch, who may submit, validity) → review → sign → submit or export → **Activity** → **Manage** (cancel, rotate, journal download and import).
 
 **Fully local demo, no wallet or testnet needed:** the dev node serves the dApp and a local chain with 10 unlocked test EOAs and the verifier already deployed. Open http://localhost:8545 and choose "Local dev node":
 

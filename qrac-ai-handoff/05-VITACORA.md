@@ -406,3 +406,22 @@ Per-action costs are within the run-to-run variation of the signature check (fre
 #### Next
 
 Team: on Sepolia, Setup → "Deploy factory" (one time), then mint an account and send. Record the factory address in `apps/web/deployments.json` and `deployments/11155111.md`, and the Sepolia mint gas in the pitch (W9). Then Phase 3.
+
+### 7 Nov 2026 — Session 1, continued: Phase 2 proven on Sepolia
+
+**General prompt:** the team deployed the factory on Sepolia from the dApp, minted an account and sent a PQ-signed transaction; verify and record.
+
+#### Outcome
+
+- **Phase 2 is proven on a public testnet.** Factory `0xdD419ceF48230FF2694827Be8FF704ee2927960f` (implementation `0xfc9e6012776876E7D8874f070f4d55818A920B87`, locked); minted account `0xdA9dBf86544C9E82A737e94a66ec553946CDc4B6`; PQ-signed send of 0.001 ETH through the clone. All checked independently from raw chain data: code identical to the build, implementation locked, account address equals an independent CREATE2 computation, 45-byte proxy code, LMS signature valid (tampered copy invalid), nonce and recipient balance as expected. Record: [`deployments/11155111.md`](../deployments/11155111.md).
+- **Sepolia numbers (authoritative for the pitch):** creating an account **10,527,434 → 738,305 gas (≈ 14.3× cheaper)**; a PQ-signed send costs the same through the clone (501,925 vs 506,958). The one-time factory deployment (12.6M gas) pays for itself from the second account.
+- `apps/web/deployments.json` now lists the Sepolia factory, so the dApp pre-fills it.
+- Pitch: W9 set to ✅ with the Sepolia figure.
+
+#### Phase status
+
+| Phase | Status |
+|---|---|
+| 1 — MVP (verifier, account, dApp) | ✅ local + Sepolia |
+| 2 — Mint (factory, minimal-proxy accounts) | ✅ local + Sepolia |
+| 3 — EIP-8141 frame transactions + ERC-8421 alternative mempool | Next. Needs the hackathon devnet details (RPC, explorer, faucet, submission method, staking registry) from the alt-mempool team. |
