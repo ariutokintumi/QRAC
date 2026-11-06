@@ -234,18 +234,21 @@ async function connect() {
     }
     S.signer = await S.provider.getSigner(sel.value);
     S.devInfo = info;
-    if (!S.settings.verifiers?.[info.chainId]) {
-      S.settings.verifiers = { ...(S.settings.verifiers || {}), [info.chainId]: info.verifier };
-      J.saveSettings(S.settings);
-    }
+    // the dev node is a fresh chain: always use its pre-deployed shared contracts
+    S.settings.verifiers = { ...(S.settings.verifiers || {}), [info.chainId]: info.verifier };
+    if (info.factory) S.settings.factories = { ...(S.settings.factories || {}), [info.chainId]: info.factory };
+    J.saveSettings(S.settings);
   }
   S.submitter = await S.signer.getAddress();
   S.chainId = (await S.provider.getNetwork()).chainId.toString();
-  const known = S.known?.[S.chainId]?.verifier;
-  if (known && !S.settings.verifiers?.[S.chainId]) {
-    S.settings.verifiers = { ...(S.settings.verifiers || {}), [S.chainId]: known };
-    J.saveSettings(S.settings);
+  const known = S.known?.[S.chainId] || {};
+  if (known.verifier && !S.settings.verifiers?.[S.chainId]) {
+    S.settings.verifiers = { ...(S.settings.verifiers || {}), [S.chainId]: known.verifier };
   }
+  if (known.factory && !S.settings.factories?.[S.chainId]) {
+    S.settings.factories = { ...(S.settings.factories || {}), [S.chainId]: known.factory };
+  }
+  J.saveSettings(S.settings);
   const bal = await S.provider.getBalance(S.submitter);
   $('netPill').textContent = `chain ${S.chainId} · ${short(S.submitter)}`;
   $('netPill').className = 'pill ok';
@@ -254,6 +257,7 @@ async function connect() {
     <dt>Gas-paying wallet</dt><dd>${addrLink(S.submitter)}</dd>
     <dt>Its balance</dt><dd>${E.formatEther(bal)} ETH</dd>`;
   $('verifierAddr').value = S.settings.verifiers?.[S.chainId] || '';
+  $('factoryAddr').value = S.settings.factories?.[S.chainId] || '';
   log(`Connected: chain ${S.chainId}, gas payer ${S.submitter}`);
   renderAccountSelect();
   await refresh();
@@ -280,6 +284,60 @@ $('btnDeployVerifier').onclick = () => guard('Deploy verifier', async () => {
   J.saveSettings(S.settings);
   log(`LMSVerifier deployed at ${a}`);
 });
+
+function factoryAddress() {
+  return S.settings.factories?.[S.chainId] || null;
+}
+function factoryContract(runner) {
+  const f = factoryAddress();
+  if (!f) throw new Error('set or deploy the factory first (Setup tab)');
+  return new E.Contract(f, S.art.QRACFactory.abi, runner || S.provider);
+}
+
+$('btnSaveFactory').onclick = () => guard('Save factory', async () => {
+  requireConnected();
+  const a = E.getAddress($('factoryAddr').value.trim());
+  if ((await S.provider.getCode(a)) === '0x') throw new Error('no contract at that address on this chain');
+  const v = await new E.Contract(a, S.art.QRACFactory.abi, S.provider).verifier();
+  const mine = S.settings.verifiers?.[S.chainId];
+  if (mine && v.toLowerCase() !== mine.toLowerCase()) log(`Note: this factory uses verifier ${v}, not ${mine}.`);
+  S.settings.factories = { ...(S.settings.factories || {}), [S.chainId]: a };
+  J.saveSettings(S.settings);
+  log(`Factory for chain ${S.chainId}: ${a}`);
+  await updatePredicted();
+});
+$('btnDeployFactory').onclick = () => guard('Deploy factory', async () => {
+  requireConnected();
+  const verifier = S.settings.verifiers?.[S.chainId];
+  if (!verifier) throw new Error('set or deploy the verifier first');
+  const f = new E.ContractFactory(S.art.QRACFactory.abi, S.art.QRACFactory.bytecode, S.signer);
+  log('Deploying QRACFactory (it also deploys the shared, locked account logic)… confirm in your wallet.');
+  const c = await f.deploy(verifier);
+  await c.waitForDeployment();
+  const a = await c.getAddress();
+  $('factoryAddr').value = a;
+  S.settings.factories = { ...(S.settings.factories || {}), [S.chainId]: a };
+  J.saveSettings(S.settings);
+  log(`QRACFactory deployed at ${a} (implementation ${await c.implementation()})`);
+  await updatePredicted();
+});
+
+/** Show the account's address before it exists (CREATE2 prediction from the public key). */
+async function updatePredicted() {
+  const el = $('predictedAddr');
+  const a = currentAccount();
+  if (!a || a.address) return;
+  if (!S.provider || !factoryAddress()) {
+    el.textContent = 'connect and set the factory to see it';
+    return;
+  }
+  const f = factoryContract();
+  const pk = a.trees[0].publicKey;
+  const [addr, minted] = await Promise.all([f.predictAddress(pk), f.isMinted(pk)]);
+  const balance = await S.provider.getBalance(addr);
+  el.innerHTML = `${addrLink(addr)} ${minted ? '<span class="pill ok">minted</span>' : '<span class="pill warn">not minted yet</span>'}
+    <span class="small muted">· balance ${E.formatEther(balance)} ETH</span>`;
+}
 
 // ---------------------------------------------------------------------------------------------
 // key trees
@@ -335,7 +393,10 @@ function renderAccountSelect() {
   $('acctIndex').value = list.length ? Math.max(...list.map((a) => a.accountIndex)) + 1 : 0;
   const a = currentAccount();
   $('deployBox').classList.toggle('hidden', !a || !!a.address);
-  if (a && !a.address) $('pubKeyOut').value = a.trees[0].publicKey;
+  if (a && !a.address) {
+    $('pubKeyOut').value = a.trees[0].publicKey;
+    updatePredicted().catch((e) => log('Address prediction failed: ' + explain(e)));
+  }
 }
 $('acctSelect').onchange = () => {
   S.current = $('acctSelect').value || null;
@@ -374,6 +435,24 @@ $('btnDeployAccount').onclick = () => guard('Deploy account', async () => {
   const c = await f.deploy(verifier, a.trees[0].publicKey);
   await c.waitForDeployment();
   await attach(await c.getAddress());
+});
+
+$('btnMint').onclick = () => guard('Mint', async () => {
+  requireConnected();
+  const a = currentAccount();
+  if (!a) throw new Error('generate a key tree first');
+  const pk = a.trees[0].publicKey;
+  const f = factoryContract(S.signer);
+  const predicted = await f.predictAddress(pk);
+  if (!(await f.isMinted(pk))) {
+    log('Minting your QRAC account… confirm in your wallet. The minting wallet gets no rights over it.');
+    const tx = await f.mint(pk);
+    const r = await tx.wait();
+    log(`Minted ${predicted} in block ${r.blockNumber}, gas used ${r.gasUsed} (tx ${tx.hash}).`);
+  } else {
+    log(`Account ${predicted} was already minted; attaching.`);
+  }
+  await attach(predicted);
 });
 
 async function attach(address) {
@@ -779,11 +858,13 @@ async function renderActivity() {
     fetch('deployments.json').then((r) => r.json()).catch(() => ({})),
   ]);
   S.known = known;
+  S.artFactory = await fetch('artifacts/QRACFactory.json').then((r) => r.json());
   // drop a verifier saved under an unknown chain by the earlier connect bug
   if (S.settings.verifiers?.null) { delete S.settings.verifiers.null; J.saveSettings(S.settings); }
   S.words = w;
-  S.art = { LMSVerifier: v, QRACAccount: acc };
-  S.accountIface = new E.Interface(acc.abi);
+  S.art = { LMSVerifier: v, QRACAccount: acc, QRACFactory: S.artFactory };
+  // account + factory errors decode in one place
+  S.accountIface = new E.Interface([...acc.abi, ...S.artFactory.abi.filter((x) => x.type === 'error')]);
   const m = J.loadMnemonic();
   if (m) await loadSeed(m);
   if (location.port === '8545' && !window.ethereum) {

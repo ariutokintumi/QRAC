@@ -11,8 +11,13 @@ interface ILMSVerifier {
     function signatureLength(uint256 lmsType, uint256 otsType) external pure returns (uint256);
 }
 
-/// @title QRAC account (Phase 1 PoC)
+/// @title QRAC account
 /// @notice A personal contract account controlled ONLY by a post-quantum LMS key (RFC 8554).
+///         Two ways to exist:
+///           - standalone: deployed with a public key in the constructor (Phase 1);
+///           - minted: an ERC-1167 minimal-proxy clone created AND initialized in one transaction by
+///             QRACFactory (Phase 2). The shared implementation is deployed with an empty key, which
+///             locks it forever: it can never be initialized or used.
 ///         Assets belong to this contract. Any EOA can pay gas to deliver a signed authorization
 ///         (open mode), or the signature can name the only allowed submitter (restricted mode).
 ///         There is no owner EOA, no admin, no upgrade and no ECDSA path of any kind.
@@ -73,7 +78,9 @@ contract QRACAccount {
 
     uint64 public epoch;
     uint64 public nonce;
-    uint256 private _locked; // reentrancy guard: 1 = idle, 2 = executing
+    /// Lifecycle + reentrancy guard:
+    /// 0 = not initialized (fresh clone) · 1 = active, idle · 2 = active, executing · 3 = locked implementation.
+    uint256 private _locked;
 
     /// Consumed leaves: key = (epoch << 32) | (leaf >> 8), bit = leaf & 0xff.
     mapping(uint256 => uint256) private _usedLeaves;
@@ -92,6 +99,8 @@ contract QRACAccount {
     event Received(address indexed from, uint256 amount);
 
     error Reentrancy();
+    error AccountNotActive();
+    error AlreadyInitialized();
     error InvalidPublicKey();
     error UnknownKind(uint8 kind);
     error WrongEpoch(uint64 expected, uint64 provided);
@@ -115,18 +124,28 @@ contract QRACAccount {
     // Construction
     // ---------------------------------------------------------------------
 
-    /// @param verifier_        Shared LMSVerifier.
-    /// @param initialPublicKey 56-byte LMS public key. Its parameter set is fixed for the account's lifetime.
+    /// @param verifier_        Shared LMSVerifier (immutable: clones inherit it from the implementation's code).
+    /// @param initialPublicKey 56-byte LMS public key, parameter set fixed for the account's lifetime.
+    ///                         EMPTY = deploy the locked implementation used by QRACFactory clones.
     /// @dev The deployer receives no rights of any kind.
     constructor(ILMSVerifier verifier_, bytes memory initialPublicKey) {
         verifier = verifier_;
-        _locked = 1;
-        bytes32 fp = _installKey(initialPublicKey);
-        emit AccountCreated(address(verifier_), fp);
+        if (initialPublicKey.length == 0) {
+            _locked = 3; // implementation: can never be initialized or used
+        } else {
+            _initialize(initialPublicKey);
+        }
+    }
+
+    /// @notice One-shot initialization of a fresh clone. QRACFactory calls it in the SAME transaction
+    ///         that creates the clone, so no one can initialize someone else's account in between.
+    function initialize(bytes calldata initialPublicKey) external {
+        if (_locked != 0) revert AlreadyInitialized();
+        _initialize(initialPublicKey);
     }
 
     // ---------------------------------------------------------------------
-    // The only state-changing entry point
+    // The only spending / configuration entry point
     // ---------------------------------------------------------------------
 
     /// @notice Execute one PQ-authorized action.
@@ -134,7 +153,10 @@ contract QRACAccount {
     /// @param payload    Signed payload (see contract docs).
     /// @param signature  LMS signature over `authorizationMessage(h, leaf, payload)`; leaf = first 4 bytes.
     function submit(Header calldata h, bytes calldata payload, bytes calldata signature) external {
-        if (_locked != 1) revert Reentrancy();
+        if (_locked != 1) {
+            if (_locked == 2) revert Reentrancy();
+            revert AccountNotActive();
+        }
         _locked = 2;
 
         uint32 leaf = _checkAndConsume(h, payload, signature);
@@ -290,6 +312,12 @@ contract QRACAccount {
         bytes32 fp = _installKey(newPublicKey);
         epoch = nextEpoch;
         emit KeyRotated(nextEpoch, fp);
+    }
+
+    function _initialize(bytes memory initialPublicKey) private {
+        _locked = 1;
+        bytes32 fp = _installKey(initialPublicKey);
+        emit AccountCreated(address(verifier), fp);
     }
 
     function _installKey(bytes memory pk) private returns (bytes32 fp) {

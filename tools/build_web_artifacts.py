@@ -18,9 +18,9 @@ OUT_DIR = os.path.join(HERE, "..", "apps", "web", "artifacts")
 
 
 def main():
-    compiled = compile_contracts("LMSVerifier.sol", "QRACAccount.sol")
+    compiled = compile_contracts("LMSVerifier.sol", "QRACAccount.sol", "QRACFactory.sol")
     os.makedirs(OUT_DIR, exist_ok=True)
-    for name in ("LMSVerifier", "QRACAccount"):
+    for name in ("LMSVerifier", "QRACAccount", "QRACFactory"):
         c = compiled[name]
         out = {
             "contractName": name,

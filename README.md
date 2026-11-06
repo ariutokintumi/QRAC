@@ -45,7 +45,7 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 | Phase | What | Status |
 |---|---|---|
 | **1 — MVP** | Shared PQ **verifier** contract · user **account** PoC (single PQ authority, calls and atomic batches, replay protection) · **dApp** in plain HTML/CSS/JS with no backend (signer state in `localStorage` plus a JSON backup download after each signature, developer mode) · tests, gas benchmark, local demo | ✅ Done: local and **on Sepolia** ([PQ-signed transfer](https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c), [records](deployments/11155111.md)) |
-| **2 — Mint** | On-chain **factory** so anyone can mint (deploy and initialize atomically) their own QRAC account from the dApp | Planned |
+| **2 — Mint** | On-chain **factory** so anyone can mint (deploy and initialize atomically) their own QRAC account from the dApp: a 45-byte clone of shared logic, address known before minting | ✅ Done locally (mint ≈ 9.6× cheaper) · Sepolia run pending |
 | **3 — Frame transactions** | Native validation of **EIP-8141 frame transactions** (`VERIFY` frame → `APPROVE`), submitted through the **ERC-8421 alternative mempool** on the hackathon devnet. PQ verification needs more than the public mempool's 100k verification-gas budget, so the alt mempool is what makes it possible. | Planned |
 
 ### Measured so far (local EVM, LMS H10/W4)
@@ -55,7 +55,8 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 | Post-quantum signature check | ~172k–220k gas · 2,508-byte signature |
 | Full account action (send, token transfer, 5-call batch, cancel, rotate) | ~285k–345k gas per transaction |
 | Browser key generation / signing | 1,024 one-time keys in ~1–2.3 s (Web Worker) · one signature in ~2–15 ms |
-| Tests | 46 Python tests (incl. RFC 8554 vectors on-chain and a simulated compromise of the deployer's ECDSA key) + 10 browser self-test checks + an end-to-end dApp run on the local dev node |
+| Creating an account | standalone 1.61M gas → **minted 168k gas** (local); Sepolia standalone 10.5M, Sepolia mint pending |
+| Tests | 77 Python tests (incl. RFC 8554 vectors on-chain, a simulated compromise of the deployer's ECDSA key, and every account test repeated on minted clones) + 10 browser self-test checks + end-to-end dApp runs |
 
 Details and methodology: [vitácora](qrac-ai-handoff/05-VITACORA.md).
 
@@ -77,11 +78,12 @@ Requirements: a browser, [Remix IDE](https://remix.ethereum.org), a wallet with 
 
 **Contracts (Remix, default compiler settings, solc 0.8.24 or later):**
 
-1. Deploy `contracts/LMSVerifier.sol` once per chain. It is shared by every account.
-2. Deploy `contracts/QRACAccount.sol` with `verifier` = the address from step 1 and `initialPublicKey` = your 56-byte LMS public key (the dApp generates it from your 24 words: Account tab → "Generate key tree").
-3. Fund the account by sending ETH or tokens to its address. From then on, only PQ-signed authorizations submitted through `submit()` can move them.
+1. Deploy `contracts/LMSVerifier.sol` once per chain (the signature maths, shared by everyone).
+2. Deploy `contracts/QRACFactory.sol` once per chain with `verifier_` = the address from step 1 (put `QRACAccount.sol` in the same Remix workspace; the factory deploys the shared, locked account logic itself).
+3. Mint your account: `mint(publicKey)` with your 56-byte LMS public key (the dApp generates it from your seed: Account tab → "Generate key tree"). `predictAddress(publicKey)` tells you the address beforehand.
+4. Fund the account by sending ETH or tokens to its address (even before minting). From then on, only PQ-signed authorizations submitted through `submit()` can move them.
 
-The dApp can also deploy both contracts itself with your connected wallet (Setup → "Deploy verifier", Account → "Deploy account").
+The dApp does all of this with your connected wallet (Setup → "Deploy verifier" / "Deploy factory", Account → "Mint account"). A standalone account (full contract, Phase 1 style) is still possible: deploy `QRACAccount.sol` with `verifier` and `initialPublicKey`.
 
 **dApp with a browser wallet (MetaMask, Brave Wallet…) on Sepolia:** the dApp must be served over `http://localhost` (browsers block the key-generation worker on `file://`). Any of these works, they serve the same files:
 

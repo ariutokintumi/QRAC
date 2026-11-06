@@ -6,7 +6,7 @@ eth-tester), plus a static file server for the dApp — one command, no MetaMask
 
 - Serves apps/web at /, JSON-RPC at /rpc.
 - 10 unlocked test accounts with test ETH (eth_sendTransaction signs for them).
-- Pre-deploys the shared LMSVerifier; the dApp reads its address with `qrac_devInfo`.
+- Pre-deploys the shared LMSVerifier and QRACFactory; the dApp reads them with `qrac_devInfo`.
 - State lives in memory only and is lost when the process stops.
 
 Test-only. Implements just the JSON-RPC subset that ethers v6 and the QRAC dApp use.
@@ -94,8 +94,9 @@ class DevNode:
         self.chain = Chain()
         self.t = self.chain.t
         self.chain_id = self.t.backend.chain.chain_id
-        c = compile_contracts("LMSVerifier.sol")
+        c = compile_contracts("LMSVerifier.sol", "QRACAccount.sol", "QRACFactory.sol")
         self.verifier = self.chain.deploy(c["LMSVerifier"]["bin"])
+        self.factory = self.chain.deploy(c["QRACFactory"]["bin"], ["address"], [self.verifier])
 
     # ---- helpers -------------------------------------------------------------------------
     def tx_params(self, tx: dict, with_gas=True) -> dict:
@@ -199,7 +200,8 @@ class DevNode:
         if method == "eth_getLogs":
             return []
         if method == "qrac_devInfo":
-            return {"chainId": str(self.chain_id), "verifier": self.verifier, "accounts": list(self.chain.accounts)}
+            return {"chainId": str(self.chain_id), "verifier": self.verifier, "factory": self.factory,
+                    "accounts": list(self.chain.accounts)}
         if method == "qrac_timeTravel":
             ts = t.get_block_by_number("latest")["timestamp"] + int(params[0])
             t.time_travel(ts)
@@ -264,7 +266,7 @@ def main():
     ap.add_argument("--port", type=int, default=8545)
     args = ap.parse_args()
     NODE = DevNode()
-    print(f"QRAC devnode  chainId={NODE.chain_id}  verifier={NODE.verifier}")
+    print(f"QRAC devnode  chainId={NODE.chain_id}  verifier={NODE.verifier}  factory={NODE.factory}")
     print(f"dApp: http://localhost:{args.port}/   RPC: http://localhost:{args.port}/rpc")
     ThreadingHTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
 

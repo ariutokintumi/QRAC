@@ -349,3 +349,60 @@ Contract creation is far more expensive on Sepolia today than on the local Cancu
 | # | Decision | Status |
 |---|---|---|
 | D-1.45 | QRAC is a **personal** account. The Safe reference means "the account can do whatever its owner wants", not multisig. The submitter restriction and validity window **stay in the contract** (already built and tested, negligible cost). In the dApp they are **hidden under a collapsed "Advanced options"** with defaults **anyone can submit** and **valid for 60 minutes**, so the normal flow is: build action → review → sign → submit. The review screen still shows both values before signing. Closes O-1.5. | Decided · Done · Verified in browser |
+
+### 7 Nov 2026 — Session 1, continued: Phase 2 factory ("mint your account")
+
+**General prompt:** add the presentation's "wow factors", then build the factory so each user mints a minimal account that reuses shared logic.
+
+#### Pitch
+
+- Added an evidence-backed **"Wow factors" section** to [04-PITCH-OUTLINE.md](04-PITCH-OUTLINE.md): nine one-line claims (W1–W9), each linked to evidence and marked ✅ demonstrated or 🔜 planned, a 3-slide short version, and claim guardrails (simulated compromise, "not audited", no "quantum-proof Ethereum").
+
+#### Decisions
+
+| # | Decision | Status |
+|---|---|---|
+| D-2.1 | **Three layers:** (1) `LMSVerifier`, the signature maths, once per chain (already shared since Phase 1); (2) the **account logic**, one locked `QRACAccount` implementation per chain, created by the factory's constructor; (3) **per user, a 45-byte ERC-1167 minimal proxy** with its own storage and balance that delegates to (2). What Phase 2 stops repeating is the account logic, not the maths. | Decided · Done |
+| D-2.2 | **No constructor in minted accounts:** `QRACFactory.mint(publicKey)` creates the clone **and** calls its one-shot `initialize(publicKey)` in the same transaction. No front-running window, and an invalid key reverts the whole mint. | Decided · Done |
+| D-2.3 | **`QRACAccount` lifecycle:** constructor with a key = standalone account (Phase 1, unchanged behaviour); constructor with an **empty key = locked implementation** (can never be initialized or used); fresh clone = inactive until initialized. New errors `AccountNotActive`, `AlreadyInitialized`. `initialize` is one-shot, so the account still has no owner or admin path. | Decided · Done |
+| D-2.4 | **Deterministic address:** `CREATE2` with `salt = keccak256(publicKey)`. The address is known before minting (it can receive funds first), one address per key, and nobody can mint that address with a different key. Minting is permissionless; the minter gets no rights. | Decided · Done |
+| D-2.5 | **No upgrades:** clones point to one fixed implementation forever; the factory has no owner. | Decided · Done |
+| D-2.6 | **dApp:** Setup shows the two shared contracts (verifier, factory) with save / deploy; the Account tab shows **"Your account address"** before minting (with its balance) and a **"Mint account"** button. Standalone deployment and Remix moved under "Other ways". The dev node pre-deploys the factory. | Decided · Done |
+| D-2.7 | **Known limit:** ETH sent with a 2,300-gas stipend (Solidity `transfer`/`send` from other contracts) may not reach a minted account, because the proxy's delegate call needs more gas. Ordinary wallet transfers and contract calls with normal gas are unaffected. | Recorded |
+
+#### Evidence
+
+`.venv\Scripts\python tools/run_tests.py` → **77 tests, all passing.** The full account behaviour suite now runs twice, once on standalone accounts and once on **minted clones**, plus 7 factory rules:
+
+| Factory rule | Result |
+|---|---|
+| Implementation is locked: `initialize` → `AlreadyInitialized`, `submit` → `AccountNotActive`, no key installed | Pass |
+| Minted code is exactly the 45-byte ERC-1167 proxy, and the address equals an **independent CREATE2 computation** in Python and `predictAddress()` | Pass |
+| One address per key: minting the same key again → `AlreadyMinted` | Pass |
+| A stranger can mint (and pay) for your key but gets no rights: re-initialize refused, fake signature refused; the key holder spends | Pass |
+| Funds sent to the predicted address **before** minting are spendable after minting | Pass |
+| Two minted accounts are independent (state, balances, signatures not transferable) | Pass |
+| `AccountMinted` event emitted with the key fingerprint | Pass |
+| Mint with an invalid key reverts and leaves no code at the predicted address | Pass |
+
+**dApp end to end (built-in browser + dev node):** create seed → connect → key tree → the predicted address is shown before it exists → 0.1 ETH sent to it in advance → **Mint** (167,575 gas) → auto-attach, balance 0.1 ETH already there → PQ-signed send of 0.03 ETH delivered by a relayer EOA (350,198 gas), encoding identical to the contract's.
+
+#### Measurements (local chain, Cancun rules, LMS H10/W4, total transaction gas)
+
+| | Standalone (Phase 1) | Minted (Phase 2) |
+|---|---|---|
+| Create one user account | 1,614,252 | **167,575** (≈ 9.6× cheaper) |
+| One-time shared setup | none | factory + implementation 1,814,349 |
+| Send ETH / ERC-20 / 5-call batch / cancel / rotate | 346k / 339k / 353k / 283k / 326k | 332k / 325k / 339k / 295k / 329k |
+
+Per-action costs are within the run-to-run variation of the signature check (fresh random keys each run); the proxy hop costs a few thousand gas. **Sepolia figures pending** (factory not deployed there yet); on Sepolia a standalone account cost 10.5M gas.
+
+#### Files
+
+- `contracts/QRACFactory.sol` (new), `contracts/QRACAccount.sol` (clone-ready).
+- `tools/tests/test_account_evm.py` (clone variants, `FactoryRules`, gas report), `tools/devnode.py`, `tools/build_web_artifacts.py`.
+- `apps/web/index.html`, `apps/web/js/app.js`, `apps/web/artifacts/QRACFactory.json`.
+
+#### Next
+
+Team: on Sepolia, Setup → "Deploy factory" (one time), then mint an account and send. Record the factory address in `apps/web/deployments.json` and `deployments/11155111.md`, and the Sepolia mint gas in the pitch (W9). Then Phase 3.

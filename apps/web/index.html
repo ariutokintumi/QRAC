@@ -81,11 +81,18 @@
       </div>
       <div class="row"><button id="btnConnect">Connect</button></div>
       <dl class="kv" id="netInfo"></dl>
-      <h3>Shared verifier (one per chain)</h3>
+      <h3>Shared contracts (deployed once per chain, used by everyone)</h3>
+      <label for="verifierAddr">1 · Verifier: the post-quantum signature maths</label>
       <div class="row">
         <input id="verifierAddr" placeholder="0x… LMSVerifier address" style="flex:1; min-width:260px">
         <button id="btnSaveVerifier" class="secondary">Save</button>
         <button id="btnDeployVerifier" class="secondary">Deploy verifier</button>
+      </div>
+      <label for="factoryAddr">2 · Factory: mints accounts (holds the shared account logic)</label>
+      <div class="row">
+        <input id="factoryAddr" placeholder="0x… QRACFactory address" style="flex:1; min-width:260px">
+        <button id="btnSaveFactory" class="secondary">Save</button>
+        <button id="btnDeployFactory" class="secondary">Deploy factory</button>
       </div>
     </section>
   </div>
@@ -111,12 +118,23 @@
       <p class="small muted" id="treeStatus"></p>
 
       <div id="deployBox" class="hidden">
-        <h3>Deploy or attach</h3>
-        <label>Public key (constructor argument <code>initialPublicKey</code> if you deploy with Remix)</label>
-        <textarea id="pubKeyOut" readonly rows="3"></textarea>
+        <h3>Mint your account</h3>
+        <dl class="kv">
+          <dt>Your account address</dt><dd id="predictedAddr" class="muted">connect and set the factory to see it</dd>
+        </dl>
+        <p class="small muted">The address is known before minting (CREATE2), so it can already receive funds.
+          Minting creates a 45-byte account that uses the shared logic, in one transaction.</p>
         <div class="row">
-          <button id="btnDeployAccount">Deploy account with connected wallet</button>
+          <button id="btnMint">Mint account (factory)</button>
         </div>
+        <details class="advanced">
+          <summary>Other ways: standalone deployment or Remix</summary>
+          <label>Public key (constructor argument <code>initialPublicKey</code> if you deploy with Remix)</label>
+          <textarea id="pubKeyOut" readonly rows="3"></textarea>
+          <div class="row">
+            <button id="btnDeployAccount" class="secondary">Deploy standalone account (full contract, expensive)</button>
+          </div>
+        </details>
         <div class="row">
           <input id="attachAddr" placeholder="0x… account deployed with Remix" style="flex:1; min-width:260px">
           <button id="btnAttach" class="secondary">Attach</button>

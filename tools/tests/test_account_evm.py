@@ -34,6 +34,9 @@ ERRORS = {
     name: keccak(text=sig)[:4]
     for name, sig in {
         "Reentrancy": "Reentrancy()",
+        "AccountNotActive": "AccountNotActive()",
+        "AlreadyInitialized": "AlreadyInitialized()",
+        "AlreadyMinted": "AlreadyMinted(address)",
         "InvalidPublicKey": "InvalidPublicKey()",
         "UnknownKind": "UnknownKind(uint8)",
         "WrongEpoch": "WrongEpoch(uint64,uint64)",
@@ -61,7 +64,7 @@ COMPILED = None
 def compiled():
     global COMPILED
     if COMPILED is None:
-        COMPILED = compile_contracts("LMSVerifier.sol", "QRACAccount.sol", "test/Mocks.sol")
+        COMPILED = compile_contracts("LMSVerifier.sol", "QRACAccount.sol", "QRACFactory.sol", "test/Mocks.sol")
     return COMPILED
 
 
@@ -101,6 +104,9 @@ class Signer:
 
 
 class AccountTestBase(unittest.TestCase):
+    # "direct": standalone QRACAccount (Phase 1). "clone": ERC-1167 clone minted by QRACFactory (Phase 2).
+    MODE = "direct"
+
     def setUp(self):
         c = compiled()
         self.c = c
@@ -108,6 +114,8 @@ class AccountTestBase(unittest.TestCase):
         self.deployer, self.relayer, self.recipient, self.other = self.chain.accounts[:4]
         self.chain_id = self.chain.t.backend.chain.chain_id
         self.verifier = self.chain.deploy(c["LMSVerifier"]["bin"], sender=self.deployer)
+        if self.MODE == "clone":
+            self.factory = self.chain.deploy(c["QRACFactory"]["bin"], ["address"], [self.verifier], sender=self.deployer)
         self.signer = Signer(new_key(1))
         self.account = self.deploy_account(self.signer.key.public_key())
         # Fund the account from the (compromised) deployer EOA.
@@ -117,8 +125,35 @@ class AccountTestBase(unittest.TestCase):
     # --- helpers ---------------------------------------------------------------------------
 
     def deploy_account(self, public_key: bytes) -> str:
+        if self.MODE == "clone" and not self.is_minted(public_key):
+            return self.mint(public_key)
+        # Standalone deployment. In clone mode this is only used to create a SECOND account with the same key
+        # (one key -> one minted address), purely to test cross-account message binding.
         return self.chain.deploy(self.c["QRACAccount"]["bin"], ["address", "bytes"], [self.verifier, public_key],
                                  sender=self.deployer)
+
+    def predict(self, public_key: bytes) -> str:
+        out = self.chain.call(self.factory, calldata("predictAddress(bytes)", ["bytes"], [public_key]))
+        return to_checksum_address(decode_output(["address"], out)[0])
+
+    def is_minted(self, public_key: bytes) -> bool:
+        out = self.chain.call(self.factory, calldata("isMinted(bytes)", ["bytes"], [public_key]))
+        return decode_output(["bool"], out)[0]
+
+    def mint(self, public_key: bytes, sender=None) -> str:
+        r = self.chain.transact(self.factory, calldata("mint(bytes)", ["bytes"], [public_key]),
+                                sender=sender or self.deployer)
+        if r.status != 1:
+            raise RuntimeError("mint failed")
+        return self.predict(public_key)
+
+    def expect_error(self, error: str, target: str, data: bytes, sender=None):
+        with self.assertRaises(Exception) as ctx:
+            self.chain.call(target, data, sender=sender or self.relayer)
+        got = revert_data(ctx.exception)
+        self.assertEqual(got[:4], ERRORS[error], f"expected {error}, got {got[:4].hex()} / {ctx.exception.args}")
+        self.assertEqual(self.chain.transact(target, data, sender=sender or self.relayer).status, 0)
+        return got
 
     def deploy_mock(self, name: str) -> str:
         return self.chain.deploy(self.c[name]["bin"], sender=self.deployer)
@@ -238,12 +273,18 @@ class Authority(AccountTestBase):
         self.assertEqual(self.nonce(), 0)
 
     def test_only_submit_changes_state(self):
-        """ABI surface: the only non-view entry point is submit(); receive() only accepts funds."""
+        """ABI surface: submit() is the only spending/configuration entry point; initialize() is one-shot
+        and already used; receive() only accepts funds."""
         mutating = sorted(
             f["name"] for f in self.c["QRACAccount"]["abi"]
             if f["type"] == "function" and f["stateMutability"] in ("nonpayable", "payable")
         )
-        self.assertEqual(mutating, ["submit"])
+        self.assertEqual(mutating, ["initialize", "submit"])
+        # The compromised deployer (or anyone) cannot re-initialize the account with their own key.
+        attacker_pk = new_key(66).public_key()
+        self.expect_error("AlreadyInitialized", self.account, calldata("initialize(bytes)", ["bytes"], [attacker_pk]),
+                          sender=self.deployer)
+        self.assertEqual(self.view("publicKey()", [], [], ["bytes"])[0], self.signer.key.public_key())
 
     def test_replay_rejected(self):
         h, p, s = self.authorize(auth.KIND_EXECUTE, self.transfer_payload(self.recipient, ETH))
@@ -398,6 +439,9 @@ class Lifecycle(AccountTestBase):
         for bad in (pk[:-1], pk + b"\x00", b"\x00\x00\x00\x0a" + pk[4:], pk[:4] + b"\x00\x00\x00\x09" + pk[8:]):
             with self.assertRaises(Exception):
                 self.deploy_account(bad)
+            if self.MODE == "clone":
+                # the failed mint leaves nothing behind at the predicted address
+                self.assertEqual(self.chain.t.get_code(self.predict(bad)), "0x")
 
 
 # =========================================================================================
@@ -478,51 +522,175 @@ class Execution(AccountTestBase):
 
 
 # =========================================================================================
+# Every behaviour test above, run again against accounts MINTED by QRACFactory (ERC-1167 clones).
+for _cls in (Encoding, Authority, SubmissionPolicy, Lifecycle, Execution):
+    globals()[_cls.__name__ + "ViaFactory"] = type(_cls.__name__ + "ViaFactory", (_cls,), {"MODE": "clone"})
+del _cls
+
+
+# =========================================================================================
+class FactoryRules(AccountTestBase):
+    MODE = "clone"
+
+    def implementation(self) -> str:
+        out = self.chain.call(self.factory, calldata("implementation()", [], []))
+        return to_checksum_address(decode_output(["address"], out)[0])
+
+    def test_implementation_is_locked(self):
+        impl = self.implementation()
+        attacker_pk = new_key(66).public_key()
+        self.expect_error("AlreadyInitialized", impl, calldata("initialize(bytes)", ["bytes"], [attacker_pk]))
+        h, p, s = self.authorize(auth.KIND_EXECUTE, self.transfer_payload(self.other, 1))
+        self.expect_error("AccountNotActive", impl, self.submit_data(h, p, s))
+        self.assertEqual(decode_output(["bytes"], self.chain.call(impl, calldata("publicKey()", [], [])))[0][24:],
+                         b"\x00" * 32)
+
+    def test_clone_bytecode_and_address_match_create2(self):
+        """Independent check: the minted code is the 45-byte ERC-1167 proxy and the address is CREATE2."""
+        impl = bytes.fromhex(self.implementation()[2:])
+        pk = self.signer.key.public_key()
+        expected_runtime = bytes.fromhex("363d3d373d3d3d363d73") + impl + bytes.fromhex("5af43d82803e903d91602b57fd5bf3")
+        code = self.chain.t.get_code(self.account)
+        self.assertEqual(bytes.fromhex(code[2:]), expected_runtime)
+        self.assertEqual(len(expected_runtime), 45)
+        init = bytes.fromhex("3d602d80600a3d3981f3363d3d373d3d3d363d73") + impl + bytes.fromhex(
+            "5af43d82803e903d91602b57fd5bf3")
+        factory = bytes.fromhex(self.factory[2:])
+        create2 = keccak(b"\xff" + factory + keccak(pk) + keccak(init))[12:]
+        self.assertEqual(to_checksum_address(create2), to_checksum_address(self.account))
+        self.assertEqual(self.predict(pk), to_checksum_address(self.account))
+
+    def test_one_address_per_key(self):
+        pk = self.signer.key.public_key()
+        self.expect_error("AlreadyMinted", self.factory, calldata("mint(bytes)", ["bytes"], [pk]))
+        other = new_key(2).public_key()
+        self.assertNotEqual(self.predict(other), self.predict(pk))
+
+    def test_anyone_can_mint_but_only_the_key_controls(self):
+        key = Signer(new_key(7))
+        account = self.mint(key.key.public_key(), sender=self.other)  # minted and paid by a stranger
+        self.chain.transact(account, b"", sender=self.deployer, value=ETH)
+        # the minter has no rights: it cannot re-initialize, nor submit without the PQ key
+        self.expect_error("AlreadyInitialized", account,
+                          calldata("initialize(bytes)", ["bytes"], [new_key(66).public_key()]), sender=self.other)
+        header = auth.Header(0, 0, auth.KIND_EXECUTE)
+        payload = self.transfer_payload(self.other, ETH)
+        fake = new_key(66).sign(0, auth.message(self.chain_id, account, header, 0, payload))
+        self.expect_error("BadSignature", account, self.submit_data(header, payload, fake), sender=self.other)
+        # the key holder can spend
+        self.submit(*self.authorize(auth.KIND_EXECUTE, self.transfer_payload(self.recipient, ETH), signer=key,
+                                    account=account), account=account)
+        self.assertEqual(self.chain.balance(account), 0)
+
+    def test_receive_before_mint(self):
+        """Counterfactual account: funds sent to the predicted address before minting are usable after."""
+        key = Signer(new_key(8))
+        predicted = self.predict(key.key.public_key())
+        self.assertEqual(self.chain.t.get_code(predicted), "0x")
+        self.chain.transact(predicted, b"", sender=self.deployer, value=2 * ETH)
+        account = self.mint(key.key.public_key())
+        self.assertEqual(account, predicted)
+        self.assertEqual(self.chain.balance(account), 2 * ETH)
+        before = self.chain.balance(self.recipient)
+        self.submit(*self.authorize(auth.KIND_EXECUTE, self.transfer_payload(self.recipient, ETH), signer=key,
+                                    account=account), account=account)
+        self.assertEqual(self.chain.balance(self.recipient) - before, ETH)
+
+    def test_minted_accounts_are_independent(self):
+        k2 = Signer(new_key(9))
+        a2 = self.mint(k2.key.public_key())
+        self.chain.transact(a2, b"", sender=self.deployer, value=ETH)
+        self.submit(*self.authorize(auth.KIND_EXECUTE, self.transfer_payload(self.recipient, 1)))
+        self.assertEqual((self.nonce(), self.nonce(a2)), (1, 0))
+        self.assertEqual(self.chain.balance(a2), ETH)
+        # key 1's signature for account 1 is useless on account 2 (and vice versa)
+        h, p, s = self.authorize(auth.KIND_EXECUTE, self.transfer_payload(self.other, 1))
+        self.assert_fails("BadSignature", auth.Header(0, 0, auth.KIND_EXECUTE), p, s, account=a2)
+
+    def test_mint_event(self):
+        pk = new_key(10).public_key()
+        r = self.chain.transact(self.factory, calldata("mint(bytes)", ["bytes"], [pk]), sender=self.other)
+        topic = "0x" + keccak(text="AccountMinted(address,bytes32,address)").hex()
+        logs = [lg for lg in r.logs if lg["topics"][0] == topic]
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["topics"][2], "0x" + keccak(pk).hex())
+
+
+# =========================================================================================
 class GasReport(unittest.TestCase):
-    """Total transaction gas (what the submitter pays for) with the production parameter set H10/W4."""
+    """Total transaction gas (what the submitter pays for) with the production parameter set H10/W4,
+    for a standalone account (Phase 1) and an account minted by the factory (Phase 2)."""
 
     def test_gas_report(self):
         c = compiled()
         chain = Chain()
         deployer, relayer, recipient = chain.accounts[:3]
-        verifier_r = chain.transact(None, bytes.fromhex(c["LMSVerifier"]["bin"]), sender=deployer)
-        verifier = verifier_r.contract_address
-        key = lms.lms_keygen(lms.LMS_SHA256_M32_H10, lms.LMOTS_SHA256_N32_W4, os.urandom(16), os.urandom(32))
-        signer = Signer(key)
-        account_r = chain.transact(None, bytes.fromhex(c["QRACAccount"]["bin"]) + encode(
-            ["address", "bytes"], [verifier, key.public_key()]), sender=deployer)
-        account = account_r.contract_address
-        chain.transact(account, b"", sender=deployer, value=10 * ETH)
-        token = chain.deploy(c["MockToken"]["bin"])
-        chain.transact(token, calldata("mint(address,uint256)", ["address", "uint256"], [account, 10**6]))
         chain_id = chain.t.backend.chain.chain_id
-        n = [0]
+        transfer = lambda to, amt: calldata("transfer(address,uint256)", ["address", "uint256"], [to, amt])  # noqa
+        rows = []
 
-        def run(kind, payload, label, rows):
-            header = auth.Header(0 if kind != "post" else 1, n[0], kind if kind != "post" else 1)
+        def deploy(label, initcode):
+            r = chain.transact(None, initcode, sender=deployer)
+            self.assertEqual(r.status, 1, label)
+            rows.append((label, r.gas_used, len(initcode)))
+            return r.contract_address
+
+        def run(account, signer, header, payload, label):
             q = signer.take_leaf()
-            sig = key.sign(q, auth.message(chain_id, account, header, q, payload))
+            sig = signer.key.sign(q, auth.message(chain_id, account, header, q, payload))
             data = calldata(SUBMIT_SIG, SUBMIT_TYPES, [header.as_tuple(), payload, sig])
             r = chain.transact(account, data, sender=relayer)
             self.assertEqual(r.status, 1, label)
-            n[0] += 1
             rows.append((label, r.gas_used, len(data)))
 
-        rows = [("deploy LMSVerifier", verifier_r.gas_used, len(c["LMSVerifier"]["bin"]) // 2),
-                ("deploy QRACAccount", account_r.gas_used, len(c["QRACAccount"]["bin"]) // 2)]
-        transfer = lambda to, amt: calldata("transfer(address,uint256)", ["address", "uint256"], [to, amt])  # noqa
-        run(auth.KIND_EXECUTE, auth.execute_payload([auth.Call(recipient, ETH)]), "send ETH (1 call)", rows)
-        run(auth.KIND_EXECUTE, auth.execute_payload([auth.Call(token, 0, transfer(recipient, 1), True)]),
-            "ERC-20 transfer (1 call)", rows)
-        run(auth.KIND_EXECUTE, auth.execute_payload([auth.Call(token, 0, transfer(recipient, 1), True)] * 3
-                                                    + [auth.Call(recipient, 1)] * 2), "batch (5 calls)", rows)
-        run(auth.KIND_CANCEL, b"", "cancel nonce", rows)
-        key2 = lms.lms_keygen(lms.LMS_SHA256_M32_H10, lms.LMOTS_SHA256_N32_W4, os.urandom(16), os.urandom(32))
-        run(auth.KIND_ROTATE, auth.rotate_payload(key2.public_key(), 1), "rotate key", rows)
-        print("\n  [bench] QRACAccount, LMS H10/W4, total tx gas (incl. 21k base + calldata)")
-        print("  [bench] action                     gas used    calldata/code bytes")
+        def new_signer():
+            return Signer(lms.lms_keygen(lms.LMS_SHA256_M32_H10, lms.LMOTS_SHA256_N32_W4, os.urandom(16),
+                                         os.urandom(32)))
+
+        verifier = deploy("deploy LMSVerifier (once per chain)", bytes.fromhex(c["LMSVerifier"]["bin"]))
+        token = chain.deploy(c["MockToken"]["bin"])
+
+        # --- Phase 1: standalone account -------------------------------------------------------
+        s1 = new_signer()
+        a1 = deploy("deploy standalone QRACAccount", bytes.fromhex(c["QRACAccount"]["bin"]) + encode(
+            ["address", "bytes"], [verifier, s1.key.public_key()]))
+        chain.transact(a1, b"", sender=deployer, value=10 * ETH)
+        chain.transact(token, calldata("mint(address,uint256)", ["address", "uint256"], [a1, 10**6]))
+        run(a1, s1, auth.Header(0, 0, 1), auth.execute_payload([auth.Call(recipient, ETH)]), "standalone: send ETH")
+        run(a1, s1, auth.Header(0, 1, 1), auth.execute_payload([auth.Call(token, 0, transfer(recipient, 1), True)]),
+            "standalone: ERC-20 transfer")
+        run(a1, s1, auth.Header(0, 2, 1), auth.execute_payload(
+            [auth.Call(token, 0, transfer(recipient, 1), True)] * 3 + [auth.Call(recipient, 1)] * 2),
+            "standalone: batch (5 calls)")
+        run(a1, s1, auth.Header(0, 3, 3), b"", "standalone: cancel nonce")
+        run(a1, s1, auth.Header(0, 4, 2), auth.rotate_payload(new_signer().key.public_key(), 1),
+            "standalone: rotate key")
+
+        # --- Phase 2: factory + minted clone ---------------------------------------------------
+        factory = deploy("deploy QRACFactory (+implementation, once)", bytes.fromhex(c["QRACFactory"]["bin"]) +
+                         encode(["address"], [verifier]))
+        s2 = new_signer()
+        r = chain.transact(factory, calldata("mint(bytes)", ["bytes"], [s2.key.public_key()]), sender=deployer)
+        self.assertEqual(r.status, 1)
+        rows.append(("MINT account (clone + init)", r.gas_used, 4 + 32 * 4 + 64))
+        out = chain.call(factory, calldata("predictAddress(bytes)", ["bytes"], [s2.key.public_key()]))
+        a2 = to_checksum_address(decode_output(["address"], out)[0])
+        chain.transact(a2, b"", sender=deployer, value=10 * ETH)
+        chain.transact(token, calldata("mint(address,uint256)", ["address", "uint256"], [a2, 10**6]))
+        run(a2, s2, auth.Header(0, 0, 1), auth.execute_payload([auth.Call(recipient, ETH)]), "minted: send ETH")
+        run(a2, s2, auth.Header(0, 1, 1), auth.execute_payload([auth.Call(token, 0, transfer(recipient, 1), True)]),
+            "minted: ERC-20 transfer")
+        run(a2, s2, auth.Header(0, 2, 1), auth.execute_payload(
+            [auth.Call(token, 0, transfer(recipient, 1), True)] * 3 + [auth.Call(recipient, 1)] * 2),
+            "minted: batch (5 calls)")
+        run(a2, s2, auth.Header(0, 3, 3), b"", "minted: cancel nonce")
+        run(a2, s2, auth.Header(0, 4, 2), auth.rotate_payload(new_signer().key.public_key(), 1),
+            "minted: rotate key")
+
+        print("\n  [bench] LMS H10/W4, total tx gas (incl. 21k base + calldata); each run uses fresh random keys")
+        print("  [bench] action                                       gas used    calldata/initcode bytes")
         for label, gas, size in rows:
-            print(f"  [bench] {label:<26} {gas:>9,}    {size:>6,}")
+            print(f"  [bench] {label:<44} {gas:>10,}    {size:>6,}")
 
 
 if __name__ == "__main__":

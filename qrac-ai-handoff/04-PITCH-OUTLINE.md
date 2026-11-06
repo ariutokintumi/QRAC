@@ -1,10 +1,42 @@
 # QRAC — pitch outline and claim boundaries
 
-Prepared 6 November 2026. QRAC is a working name, not a finalized brand. This document is a script and slide-content proposal, not a rendered slide deck.
+Prepared 6 November 2026, updated 7 November 2026. QRAC stands for **QR Accounts**. This document is a script and slide-content proposal, not a rendered slide deck.
 
-## Current evidence status
+## ⭐ Wow factors (lead the presentation with these)
 
-The project is at architecture and planning stage. No account, verifier, signer, factory, or dApp has been implemented or benchmarked in this conversation. Every mechanism below is a design response awaiting implementation and validation. The user confirmed a **24-word / 256-bit seed** and **one focused first release sufficient to prove the concept**, without a full-Safe-parity commitment or a multi-release roadmap. In presentation drafts, mark capabilities as **designed**, **prototype-demonstrated**, or **validated** according to the evidence actually available at presentation time. Do not use hypothetical benchmark numbers, imply an audit, or claim a quantum computer was used in the demo.
+Simple to say, backed by evidence. Status: ✅ **demonstrated** (link or test exists) · 🔜 **in progress / planned** (say "coming", never "done"). Update the status column before presenting.
+
+**Tagline:** *Your wallet key can leak. Your money stays put.*
+**One sentence:** QRAC is a personal Ethereum account that only obeys a post-quantum signature, live on Sepolia today, with no protocol upgrade needed.
+
+| # | Wow factor (on-slide words) | Why it lands | Evidence | Status |
+|---|---|---|---|---|
+| W1 | **Post-quantum signature, verified live on Ethereum today.** | No fork, no new precompile: it runs on the EVM as it is. | Sepolia tx [`0x0538…abb5c`](https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c): 0.001 ETH moved only because a hash-based (RFC 8554 LMS) signature was valid; re-verified independently from raw chain data. | ✅ |
+| W2 | **Steal the wallet key, steal nothing.** | Everybody fears a leaked key. We hand the attacker the deployer's key on stage and it still can't move a wei. | Test suite "simulated ECDSA compromise" + dApp run: random, empty or foreign signatures and payload swaps all refused. | ✅ (simulated: key disclosure, not quantum hardware) |
+| W3 | **Anyone can pay the gas. Only you can say yes.** | Separates "who pays" from "who owns": a friend, a relayer or a fresh throwaway wallet can deliver your signed action. | Sepolia + local runs: actions delivered by a different EOA; optional "only this wallet may deliver" rule enforced. | ✅ |
+| W4 | **1,024 quantum-safe keys in about a second, in your browser.** | No server, no install, no extension: generated in a background tab worker; each signature takes milliseconds. | Browser self-test: tree 0.95–2.3 s, signature ~2–18 ms (Sepolia run: 0.95 s / 18 ms). | ✅ |
+| W5 | **Proven byte for byte, three times over.** | Credibility: browser, Python and Solidity produce identical bytes; the official RFC 8554 test vector verifies **on Sepolia**. | 46 Python tests + 10 browser checks + RFC Test Case 2 via `eth_call` on the Sepolia verifier. | ✅ |
+| W6 | **Works with the apps you already use.** | No protocol has to integrate anything: the account just calls them. | ERC-20 transfer + approve + revoke in one all-or-nothing batch; NFTs received and sent; any raw contract call. | ✅ (local) · Sepolia batch 🔜 |
+| W7 | **A failed transaction never bricks your account.** | The classic one-time-signature trap is solved: a failed or dropped action is replaced with a fresh key; you can cancel; you can rotate to a new key tree. | Tests + dApp run: failed batch → replacement with the same nonce; cancel; rotation to epoch 1. | ✅ |
+| W8 | **Too strong for the public mempool, so we built for the next one.** | The PQ check costs ~170k–220k gas, above the 100k validation limit of EIP-8141's public mempool, exactly what the ERC-8421 alternative mempool exists for. | Gas benchmark (Phase 1). Frame-transaction integration is Phase 3. | ✅ measured · integration 🔜 |
+| W9 | **Mint your quantum-safe account for a fraction of the cost.** | One-click "mint" through a factory: each user gets a tiny 45-byte account that shares the logic; you can even know your address before it exists. | Local chain: mint 167,575 gas vs 1,614,252 standalone (≈ 9.6× cheaper); 45-byte account, address shown before minting and fundable in advance (77 tests). Sepolia: standalone was 10.5M gas; Sepolia mint figure pending. | ✅ local · Sepolia 🔜 |
+
+### The 3-slide version (if time is short)
+
+1. **The problem in one line:** "Quantum computers (or a leaked key) break ECDSA, and ECDSA is the only lock on your Ethereum account." Visual: a key with a crack.
+2. **The trick:** "Put a post-quantum lock *inside* the account. Any wallet can carry the message, only the PQ key can sign it." Visual: PQ signer → any gas payer → QRAC account → apps. Show W1 tx link.
+3. **The demo:** give the attacker the wallet key (W2), watch it fail; then send with a fresh wallet (W3); show the Etherscan link (W1).
+
+### Claim guardrails for the wow factors
+
+- W2 is a **simulated** compromise (we disclose the key). No quantum computer is used; say so.
+- Never say "quantum-proof Ethereum": the network's own consensus and other accounts still use ECDSA. Say "your account requires a post-quantum signature".
+- Say "Sepolia testnet" and "not audited" whenever showing live transactions.
+- W8 and W9 stay 🔜 until their own evidence exists.
+
+## Original evidence status (6 Nov 2026, before implementation)
+
+At the time this outline was first written, the project was at architecture and planning stage. No account, verifier, signer, factory, or dApp had been implemented or benchmarked. Every mechanism below is a design response awaiting implementation and validation. The user confirmed a **24-word / 256-bit seed** and **one focused first release sufficient to prove the concept**, without a full-Safe-parity commitment or a multi-release roadmap. In presentation drafts, mark capabilities as **designed**, **prototype-demonstrated**, or **validated** according to the evidence actually available at presentation time. Do not use hypothetical benchmark numbers, imply an audit, or claim a quantum computer was used in the demo.
 
 The pitch should lead with this scoped claim:
 
