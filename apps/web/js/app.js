@@ -651,7 +651,7 @@ async function prepare(kind, payload, summary, calls = []) {
   $('reviewBody').innerHTML = `
     <dl class="kv">
       <dt>Chain / account</dt><dd>${S.chainId} · ${addrLink(a.address)}</dd>
-      <dt>Action</dt><dd><b>${enc.KIND_NAME[kind]}</b> — ${esc(summary)}</dd>
+      <dt>Action</dt><dd><b>${enc.KIND_NAME[kind]}</b>: ${esc(summary)}</dd>
       <dt>Key epoch / nonce</dt><dd>${header.epoch} / ${header.nonce}</dd>
       <dt>Allowed submitter</dt><dd>${header.allowedSubmitter === E.ZeroAddress ? 'anyone (open)' : `<code>${header.allowedSubmitter}</code> only`}</dd>
       <dt>Valid until</dt><dd>${header.validUntil ? new Date(header.validUntil * 1000).toLocaleString() : 'no expiry'}</dd>
@@ -716,7 +716,7 @@ function showSigned(entry) {
   $('signedPanel').classList.remove('hidden');
   $('signedBody').innerHTML = `
     <dl class="kv">
-      <dt>Action</dt><dd>${enc.KIND_NAME[entry.kind]} — ${esc(entry.summary)}</dd>
+      <dt>Action</dt><dd>${enc.KIND_NAME[entry.kind]}: ${esc(entry.summary)}</dd>
       <dt>Nonce / key</dt><dd>${entry.nonce} / one-time key #${entry.leaf} (epoch ${entry.epoch})</dd>
       <dt>Signature</dt><dd>${E.getBytes(entry.signature).length} bytes · <code>${entry.signature.slice(0, 42)}…</code></dd>
       <dt>Status</dt><dd id="signedStatus">${entry.status}</dd>

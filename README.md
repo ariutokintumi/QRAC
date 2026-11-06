@@ -1,123 +1,96 @@
-# QRAC — QR Accounts
+# QRAC (QR Accounts)
 
-**Post-quantum authorization for Ethereum accounts, on today's EVM.**
+Post-quantum accounts for Ethereum that you can use today, and that already work with EIP-8141 frame transactions.
 
-QRAC is a personal smart-contract account controlled by a **post-quantum (hash-based) signature** instead of an ECDSA key. Your assets and protocol positions belong to the account contract. Every action (a transfer, an approval, a protocol call or a batch of calls) must carry a valid one-time PQ signature over the exact action. Any wallet can pay the gas to deliver it, but no wallet owns the account.
+QRAC is a dApp plus a few contracts. You create a 24-word seed, the dApp turns it into 1,024 post-quantum one-time keys (LMS, RFC 8554, hash based), and you mint a small smart account whose only owner is that post-quantum key. Your funds live in the account. To move them you sign the exact action with a one-time key, and the account checks that signature on-chain before doing anything.
 
-If a quantum computer, or a plain leak, exposes the ECDSA key of the wallet that deployed or funded the account, that key **still can't move anything** out of it.
+- **Today (Sepolia):** any wallet can deliver your signed action and pay the gas, but no wallet owns the account. If the ECDSA key of that wallet leaks, or one day gets broken by a quantum computer, it still can't move a single wei out of your account.
+- **With frame transactions (EIP-8141 devnet):** the same idea without the ECDSA wallet. The transaction carries only the post-quantum signature, the account approves and pays its own gas, and the protocol itself makes sure each one-time key is used once. The post-quantum check needs about 250k gas of validation, which the public mempool refuses (limit 100k) and the ERC-8421 alternative mempool accepts.
 
-> Built for ETHGlobal. Status: **early development**. Nothing in this repo has been audited. Use test networks and test funds only.
+Testnets only. Not audited.
 
----
+## Live evidence
 
-## Why
-
-- Ethereum EOAs authorize everything with ECDSA (secp256k1), which a sufficiently capable quantum computer could break.
-- Waiting for protocol-level migration takes years. Smart accounts can adopt a different authorization rule **today**.
-- If the check lives **inside the user's account**, existing contract-compatible protocols need no integration at all: they just see a normal caller.
+| What | Where |
+|---|---|
+| PQ-signed transfer from a QRAC account on Sepolia | [0x0538b564…abb5c](https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c) |
+| Account minted through the factory on Sepolia (738k gas instead of 10.5M) | [records](deployments/11155111.md) |
+| PQ frame transaction admitted by the alternative mempool (all rules passed) | [explorer](https://explorer.altmempool.wtf/tx/0x2f414a944f74a803e5d3e59eb98e9bd56f2c0a6e87be9bcf5cfa42e65026f4f0) |
+| Same transaction rejected by the public mempool, attacks rejected live | [records](deployments/1337.md) |
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  U[dApp + local PQ signer<br/>24-word seed] -->|signs exact action<br/>with a one-time key| A[Signed authorization]
-  A --> G[Any gas payer EOA<br/>or a designated one]
-  G --> C[QRAC account<br/>holds assets and state]
-  C -->|verify| V[Shared PQ verifier<br/>stateless]
-  C -->|ordinary CALLs| P[Tokens and protocols]
+  U[dApp: 24-word seed, 1,024 one-time PQ keys] -->|signs the exact action| A[Signed authorization]
+  A --> G[Any wallet delivers it and pays gas]
+  G --> C[QRAC account: holds the funds]
+  C -->|checks the PQ signature| V[Shared LMS verifier]
+  C -->|normal calls| P[Tokens and apps]
 ```
 
-1. **Seed.** The dApp generates 24 BIP-39 words (256 bits of fresh entropy), independent of any Ethereum wallet.
-2. **Key tree.** From the seed it derives a Merkle tree of one-time signing keys (LMS / LM-OTS, RFC 8554). The tree's root is the account's public key.
-3. **Account.** The account stores the root, an epoch, an action nonce and which one-time keys were already used.
-4. **Authorize.** To act, the signer reserves a fresh one-time key, signs the full action (chain, account, nonce, calls, optional allowed submitter, validity window) and saves its state *before* sending.
-5. **Execute.** Any EOA submits the authorization. The account checks the signature through the shared verifier, consumes the key and the nonce, then runs the calls atomically.
-6. **Renew.** Before the tree runs out, the current key authorizes a new root (new epoch).
+1. The seed is 256 bits of fresh randomness (24 BIP-39 words). It has nothing to do with your Ethereum wallet.
+2. From the seed the dApp derives a separate key tree for each chain, account number and key epoch. The tree root is the account's public key.
+3. You mint the account through the factory. It is a 45-byte clone of shared logic, and you know its address before it exists.
+4. To act, the dApp reserves a fresh one-time key (saved before signing, never reused), signs the full action (chain, account, nonce, calls, optional allowed sender, expiry) and sends it.
+5. The account verifies the signature with the shared verifier, marks the key and the nonce as used, and runs the calls all-or-nothing.
+6. Before the 1,024 keys run out, the current key authorizes a new tree (rotation).
 
-### Security claim, scoped
+In frame mode, steps 4 and 5 change: the signature goes inside the EIP-8141 transaction, the account's VERIFY frame checks it and calls APPROVE, the account pays the gas, and the one-time key index is used as an EIP-8250 nonce key, so the network refuses a second use of it.
 
-After a trustworthy enrollment, possession or quantum recovery of the original ECDSA key **alone** does not authorize spending or configuration changes. A valid, current PQ authorization is required. Out of scope: device compromise and phishing, plus each external protocol's own admin powers and allowances.
+## Today and tomorrow, same account
 
-What QRAC does **not** claim: full privacy, MEV protection, compatibility with every app (EOA-only checks and ECDSA-only permit flows remain exceptions), Safe feature parity or audited security.
+`QRACFrameAccount` is the normal QRAC account (unchanged) plus native frame-transaction validation. It works with today's transactions through `submit()`, and on the EIP-8141 devnet it validates frame transactions directly (the account even staked itself through `submit()` and then used frame transactions).
 
-## Roadmap
+If that contract is deployed on a chain today, the same address and the same funds can keep working when frame transactions arrive. The condition is that the final EIP-8141 keeps the opcodes and parameters of the current devnet, because the account has no upgrade path (by design: nobody, not even us, can change it). The Sepolia accounts minted so far use the plain `QRACAccount`. They keep working through `submit()` in any case, but they will not validate frame transactions natively.
 
-| Phase | What | Status |
-|---|---|---|
-| **1 — MVP** | Shared PQ **verifier** contract · user **account** PoC (single PQ authority, calls and atomic batches, replay protection) · **dApp** in plain HTML/CSS/JS with no backend (signer state in `localStorage` plus a JSON backup download after each signature, developer mode) · tests, gas benchmark, local demo | ✅ Done: local and **on Sepolia** ([PQ-signed transfer](https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c), [records](deployments/11155111.md)) |
-| **2 — Mint** | On-chain **factory** so anyone can mint (deploy and initialize atomically) their own QRAC account from the dApp: a 45-byte clone of shared logic, address known before minting | ✅ Done: local and **on Sepolia**, creating an account is ≈ 14× cheaper ([records](deployments/11155111.md)) |
-| **3 — Frame transactions** | Native validation of **EIP-8141 frame transactions** (`VERIFY` frame → `APPROVE`): zero ECDSA in the transaction, the account pays its own gas, one-time keys enforced by EIP-8250 keyed nonces. The ~250k-gas PQ check is **rejected by the public mempool (100k)** and **admitted by the ERC-8421 alternative mempool**. | ✅ Done on the devnet ([admitted tx](https://explorer.altmempool.wtf/tx/0x2f414a944f74a803e5d3e59eb98e9bd56f2c0a6e87be9bcf5cfa42e65026f4f0), [records](deployments/1337.md)) |
+What QRAC does not claim: privacy, MEV protection, compatibility with apps that only accept EOAs or ECDSA permits, or audited security.
 
-### Measured so far (local EVM, LMS H10/W4)
+## Numbers
 
 | | |
 |---|---|
-| Post-quantum signature check | ~172k–220k gas · 2,508-byte signature |
-| Full account action (send, token transfer, 5-call batch, cancel, rotate) | ~285k–345k gas per transaction |
-| Browser key generation / signing | 1,024 one-time keys in ~1–2.3 s (Web Worker) · one signature in ~2–15 ms |
-| Creating an account (Sepolia) | standalone 10.5M gas → **minted 738k gas (≈ 14× cheaper)** · local: 1.61M → 168k |
-| Frame-transaction devnet | PQ frame tx admitted by the alt mempool (17/17 checks) and mined; rejected by the public mempool; VERIFY ~250k gas |
-| Tests | 101 Python tests (incl. RFC 8554 vectors on-chain, a simulated compromise of the deployer's ECDSA key, and every account test repeated on minted clones) + 11 browser self-test checks + end-to-end dApp runs |
+| Post-quantum signature check | 172k to 220k gas, signature of 2,508 bytes |
+| Account action on Sepolia (one transfer) | about 507k gas |
+| Creating an account on Sepolia | 10.5M gas standalone, 738k gas minted (14x cheaper) |
+| VERIFY frame on the devnet | about 250k gas (public mempool limit: 100k) |
+| Key tree in the browser | 1,024 keys in 1 to 3.5 s, one signature in a few ms |
+| Tests | 101 Python tests, 11 browser checks, manual runs on Sepolia and on the devnet |
 
-Details and methodology: [vitácora](qrac-ai-handoff/05-VITACORA.md).
+## Try it
 
-## Repository layout
-
-```text
-contracts/          Solidity sources (compile and deploy with Remix)   — Phases 1–3 (vendor/: HegotaSupport, MIT)
-apps/web/           dApp: static HTML + CSS + JS, no build step        — Phase 1
-                    (test.html = browser self-test)
-tools/              Python: reference LMS signer, tests, local dev node — Phase 1
-docs/               architecture notes, benchmarks, demo instructions  — as produced
-deployments/        deployment records per chain id (Sepolia: 11155111.md)
-qrac-ai-handoff/    project brief, plan, acceptance criteria, pitch and the decision log (vitácora)
-```
-
-## Getting started
-
-Requirements: a browser, [Remix IDE](https://remix.ethereum.org), a wallet with Sepolia test ETH, and [Python 3](https://www.python.org/downloads/). No Node.js, Foundry or Hardhat. On Windows, use the `py` launcher if `python` opens the Microsoft Store.
-
-**Contracts (Remix, default compiler settings, solc 0.8.24 or later):**
-
-1. Deploy `contracts/LMSVerifier.sol` once per chain (the signature maths, shared by everyone).
-2. Deploy `contracts/QRACFactory.sol` once per chain with `verifier_` = the address from step 1 (put `QRACAccount.sol` in the same Remix workspace; the factory deploys the shared, locked account logic itself).
-3. Mint your account: `mint(publicKey)` with your 56-byte LMS public key (the dApp generates it from your seed: Account tab → "Generate key tree"). `predictAddress(publicKey)` tells you the address beforehand.
-4. Fund the account by sending ETH or tokens to its address (even before minting). From then on, only PQ-signed authorizations submitted through `submit()` can move them.
-
-The dApp does all of this with your connected wallet (Setup → "Deploy verifier" / "Deploy factory", Account → "Mint account"). A standalone account (full contract, Phase 1 style) is still possible: deploy `QRACAccount.sol` with `verifier` and `initialPublicKey`.
-
-**dApp with a browser wallet (MetaMask, Brave Wallet…) on Sepolia:** the dApp must be served over `http://localhost` (browsers block the key-generation worker on `file://`). Any of these works, they serve the same files:
-
-- `http://localhost:8080` after running the static server below, or
-- `http://localhost:8545` while the local dev node (next section) is running.
+Run the site locally (or upload `apps/web` to any static host):
 
 ```bash
 py -m http.server 8080 --directory apps/web
 ```
 
-Choose "Browser wallet" and connect. On Sepolia the shared verifier and factory are already deployed and pre-filled ([addresses](deployments/11155111.md)).
+Open http://localhost:8080. The switch at the top has two modes:
 
-Flow: **Setup** (create a seed, which downloads a secret seed file, or import one; connect the wallet; verifier and factory are pre-filled or can be deployed) → **Account** (generate key tree, see your address, mint, fund) → **Compose & sign** (ETH / ERC-20 / raw calls, batch, who may submit, validity) → review → sign → submit or export → **Activity** → **Manage** (cancel, rotate, journal download and import).
+- **Current Ethereum · Sepolia:** create a seed, connect Brave Wallet or MetaMask, mint an account, fund it and send a PQ-signed action.
+- **Future Ethereum · EIP-8141 frame transactions:** no wallet extension needed. Create a devnet setup key, use the faucet, mint, fund, sign, and compare the public mempool (rejected) with the alternative mempool (admitted).
 
-**Fully local demo, no wallet or testnet needed:** the dev node serves the dApp and a local chain with 10 unlocked test EOAs and the verifier already deployed. Open http://localhost:8545 and choose "Local dev node":
+Step by step, with what you should see at each step: [docs/TEST-GUIDE.md](docs/TEST-GUIDE.md). Browser self-test: `/test.html`.
 
-```bash
-.venv\Scripts\python tools/devnode.py
+The 24 words are stored in the browser (developer mode) and in the seed file you download. The journal file (downloaded after each signature) has no secrets but you need it, together with the seed file, to keep signing from another browser.
+
+## Repository
+
+```text
+contracts/       LMSVerifier, QRACAccount, QRACFactory, QRACFrameAccount, QRACFrameFactory
+                 vendor/hegota-support: helpers for the EIP-8141 opcodes (MIT, unmodified)
+apps/web/        the dApp: plain HTML, CSS and JavaScript, no build step
+tools/           Python: reference LMS signer, frame tx codec, tests, local node, devnet script
+deployments/     what is deployed where, with transaction links (Sepolia, devnet)
+docs/            test guide, feedback for the alt-mempool team
+qrac-ai-handoff/ project brief, plan, pitch notes and the vitácora (decision log)
 ```
 
-**Frame transactions (EIP-8141, alt-mempool devnet):** open `frame.html` (or click "Future Ethereum" at the top of the dApp). It uses the same seed, creates a throwaway devnet setup key funded by the devnet faucet, mints, funds and stakes the account, then signs post-quantum frame transactions and shows the public mempool rejecting them and the alternative mempool admitting them. The same flow from the command line:
+Contracts compile with default Remix settings (solc 0.8.28). The dApp can also deploy them itself.
 
-```bash
-.venv\Scripts\python tools/devnet.py init
-```
+## Development
 
-then `fund`, `deploy` (once per devnet), `mint`, `send --route canonical`, `send`, `stake`, `attacks`, `status`.
-
-**Browser self-test:** open `/test.html` on either server to check this browser's SHA-256, LMS, BIP-39, key derivation and encoding against the Python references and the official vectors.
-
-> Developer mode: the 24 words are kept in the browser's localStorage and in the downloaded seed file (keep it secret). The journal JSON downloaded after each signature contains no secrets but is required, together with the seed file, to keep signing safely on another browser.
-
-**Tests and gas benchmark** (optional, local in-memory EVM):
+Tools needed: Python 3 and a browser. No Node.js, Foundry or Hardhat.
 
 ```bash
 py -m venv .venv
@@ -131,35 +104,21 @@ py -m venv .venv
 .venv\Scripts\python tools/run_tests.py
 ```
 
-After changing a contract or a Python reference, regenerate the dApp's compiled artifacts and the self-test fixtures:
+Other scripts:
 
-```bash
-.venv\Scripts\python tools/build_web_artifacts.py
-```
-
-```bash
-.venv\Scripts\python tools/gen_web_fixtures.py
-```
-
-Networks: **Sepolia** for Phases 1–2; the hackathon frame-transaction devnet for Phase 3.
-
-## Project documents
-
-- [Start here](qrac-ai-handoff/00-START-HERE.md)
-- [Project brief and architecture](qrac-ai-handoff/01-PROJECT-BRIEF.md)
-- [Execution plan](qrac-ai-handoff/02-EXECUTION-PLAN.md)
-- [Acceptance criteria and capability matrix](qrac-ai-handoff/03-ACCEPTANCE-AND-CAPABILITIES.md)
-- [Pitch outline](qrac-ai-handoff/04-PITCH-OUTLINE.md)
-- [Vitácora — decision log](qrac-ai-handoff/05-VITACORA.md)
+- `tools/devnode.py`: local chain plus the dApp on port 8545, for offline demos.
+- `tools/devnet.py`: the frame-transaction flow from the command line (`init`, `fund`, `deploy`, `mint`, `send`, `stake`, `attacks`, `status`).
+- `tools/build_web_artifacts.py` and `tools/gen_web_fixtures.py`: run them after changing a contract or a Python reference.
 
 ## References
 
-- [RFC 8554 — Leighton-Micali hash-based signatures (LMS)](https://www.rfc-editor.org/rfc/rfc8554.html)
-- [BIP-39 — mnemonic code](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
-- [EIP-8141 — Frame Transaction](https://eips.ethereum.org/EIPS/eip-8141)
-- [ERC-8421 — Standard alternative mempool (draft)](https://raw.githubusercontent.com/forshtat/ERCs/refs/heads/pr-clean/ERCS/erc-8421.md)
-- [ERC-1167 — Minimal proxy](https://eips.ethereum.org/EIPS/eip-1167)
-- [Ethereum quantum-resistance overview](https://ethereum.org/roadmap/security/quantum-resistance/)
+- [RFC 8554: Leighton-Micali hash-based signatures](https://www.rfc-editor.org/rfc/rfc8554.html)
+- [BIP-39: mnemonic code](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
+- [EIP-8141: Frame Transaction](https://eips.ethereum.org/EIPS/eip-8141)
+- [ERC-8421: alternative mempools (draft)](https://raw.githubusercontent.com/forshtat/ERCs/refs/heads/pr-clean/ERCS/erc-8421.md)
+- [EIP-8250: keyed nonces](https://eips.ethereum.org/EIPS/eip-8250)
+- [ERC-1167: minimal proxy](https://eips.ethereum.org/EIPS/eip-1167)
+- [Alt-mempool docs and devnet](https://docs.altmempool.wtf/)
 
 ## License
 

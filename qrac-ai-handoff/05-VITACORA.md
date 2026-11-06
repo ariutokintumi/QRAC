@@ -533,3 +533,14 @@ Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.p
 | D-3.16 | Frame page: after mint or fund, wait until the RPC reflects the new block before refreshing (observed: the code lookup right after the mint receipt still returned empty for a few seconds, showing "not minted yet"). Banner states that no wallet extension is used on this page. | Done · Verified |
 
 **Fresh-site check (public-domain scenario):** on a new origin (static server, empty browser storage) the guide's frame steps work end to end: new seed → setup key + faucet → mint → fund → sign (1 PQ / 0 ECDSA, VERIFY 251,128 gas) → public mempool rejected → alternative mempool admitted 17/17, mined in block 8429 ([`0xc3c2c834…787914`](https://explorer.altmempool.wtf/tx/0xc3c2c834e5b86fe0e147791439973a1188bfed879024b70f2753c14153787914)).
+
+### 7 Nov 2026 — Session 1, continued: submission texts and plain-language pass
+
+**General prompt:** prepare the ETHGlobal form answers around one message (a dApp that gives you post-quantum accounts today and is already compatible with EIP-8141 frame transactions, so the account can stay the same after the migration), and remove em-dashes and AI-sounding wording from the README, the website and the docs.
+
+| # | Decision | Status |
+|---|---|---|
+| D-4.1 | **Main message:** "Post-quantum accounts for Ethereum, working today and ready for EIP-8141 frame transactions." | Decided |
+| D-4.2 | **Honest scope of "same account after the migration":** `QRACFrameAccount` works today through `submit()` and validates frame transactions natively on the devnet, so the same address and funds can keep working when frame transactions ship, **provided the final EIP-8141 keeps the devnet's opcodes and parameters** (no upgrade path, by design). The accounts minted so far on Sepolia are plain `QRACAccount`: they keep working through `submit()` after the migration but do not validate frame transactions natively. A frame-ready factory on Sepolia is feasible today (estimates: implementation 15.28M gas, factory 1.85M, under the 16.7M per-transaction cap). | Decided (Sepolia frame-ready deployment pending the team's go-ahead) |
+| D-4.3 | Writing style for everything public: plain sentences, no em-dashes, little bold, the team's own tone. Applied to the README (rewritten), the website texts, `docs/` and `deployments/`. | Done |
+| D-4.4 | Form answers kept in [`docs/SUBMISSION.md`](../docs/SUBMISSION.md) (also the source for the slides). AI usage stated as it happened (Gemini research, ChatGPT planning, Claude Code development), plus the planned use for slides. | Done |

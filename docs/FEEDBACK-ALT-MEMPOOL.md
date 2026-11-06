@@ -13,7 +13,7 @@ Versions at the time: ethrex `v23.0.0-eip8141-tracer-9aa3645d`, sidecar `forshta
 
 ---
 
-## 1 — ethers v6 reports a mined transaction as failed
+## 1. ethers v6 reports a mined transaction as failed
 
 **What happened.** On our dApp's devnet page, a plain EIP-1559 funding (`wallet.sendTransaction({ to, value })`, ethers 6.13.4) threw:
 
@@ -35,7 +35,7 @@ await p.getBlock(8195, true);       // throws the same (block containing FRAME_T
 
 **Suggestion:** a warning in the docs (it affects ordinary transactions, not only frame transactions), and/or an ethers formatter for type `0x06` in `@forshtat/hegota-support`.
 
-## 2 — Replay rejected with a misleading reason
+## 2. Replay rejected with a misleading reason
 
 **What happened.** One of our security tests resubmits an already-mined QRAC frame transaction to the gateway. It was rejected (correct), but with:
 
@@ -58,13 +58,13 @@ await rpc(GW, 'eth_sendFrameTransaction', [rep.result.entry.tx]); // -> "prefix 
 
 **Suggestion:** report `executionError` when present (or both reasons).
 
-## 3 — Unstaked sender admitted with ~255k validation gas
+## 3. Unstaked sender admitted with ~255k validation gas
 
 **What happened.** Following the docs (BUDGET-010: unstaked ≤ 100,000; staked ≤ 1,000,000), our "before staking" test expected the alternative mempool to refuse our unstaked account. It was **admitted** (17/17 checks) and mined, e.g. `0xbb5ce10aadd195c67ee266424bc465e6260d49c993b011bba2fe22f1554faf44` (block 8070). `skandha_config` shows `"validationGasLimit": 10000000`.
 
 **Note:** the docs mention that the implementation follows an earlier draft. A line on the BUDGET-010 page saying the devnet does not enforce the per-entity budget yet would have saved us the investigation.
 
-## 4 — "There is no faucet"
+## 4. "There is no faucet"
 
 **What happened.** The devnet guide says "There is no faucet" and to fund a new key from the shared genesis key. While reading the workshop code we found `skandha_explorer_faucet(address)` on the gateway (1 ETH, once per hour per address), which `step_1_check` uses. We used it instead of the shared key. The guide also does not list the gateway endpoint (`https://altmempoolgateway.forshtat.com/rpc`) that the workshop sends everything through.
 
@@ -73,6 +73,6 @@ await rpc(GW, 'eth_sendFrameTransaction', [rep.result.entry.tx]); // -> "prefix 
 ## What worked very well
 
 - `ethrex_simulateFrameTransaction` and the explorer's **admission report** made every investigation quick.
-- `HegotaSupport` worked through an ERC-1167 clone (VERIFY frame → clone → implementation → `delegatecall` APPROVE helper) on the first try.
+- `HegotaSupport` worked through an ERC-1167 clone (VERIFY frame, then the clone, the implementation and the APPROVE helper by `delegatecall`) on the first try.
 - EIP-8250 keyed nonces gave our hash-based wallet **protocol-enforced one-time keys**.
-- The faucet and gateway → miner gossip were reliable all day.
+- The faucet and gossip from gateway to miner were reliable all day.

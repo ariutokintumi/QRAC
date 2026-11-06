@@ -316,7 +316,7 @@ $('btnFSign').onclick = () => guard('Sign', async () => {
     ${fr.length ? `<dt>VERIFY frame (PQ check)</dt><dd>${Number(fr[0].gasUsed).toLocaleString()} gas · ${fr[0].succeeded ? 'approved' : 'rejected'}</dd>
     <dt>SENDER frame (transfer)</dt><dd>${Number(fr[1].gasUsed).toLocaleString()} gas · ${fr[1].succeeded ? 'ok' : 'failed'}</dd>` : ''}
     <dt>Public mempool verdict</dt><dd>${sim.canonicalMempoolValid === false ? `<span class="pill warn">not allowed</span> ${esc(sim.canonicalMempoolViolation)}` : esc(String(sim.canonicalMempoolValid))}</dd>
-    <dt>Gas paid by</dt><dd>${sim.payer ? `<code>${sim.payer}</code> (the account itself)` : '—'}</dd></dl>`;
+    <dt>Gas paid by</dt><dd>${sim.payer ? `<code>${sim.payer}</code> (the account itself)` : 'n/a'}</dd></dl>`;
   $('fSubmitRow').classList.remove('hidden');
   $('fResult').innerHTML = '';
 });

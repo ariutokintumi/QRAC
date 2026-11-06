@@ -1,6 +1,6 @@
 """
 QRAC local dev node: a tiny Ethereum JSON-RPC endpoint backed by an in-memory EVM (py-evm via
-eth-tester), plus a static file server for the dApp — one command, no MetaMask, no testnet.
+eth-tester), plus a static file server for the dApp: one command, no MetaMask, no testnet.
 
     .venv\\Scripts\\python tools/devnode.py            then open http://localhost:8545
 
