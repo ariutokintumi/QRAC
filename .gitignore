@@ -1,0 +1,26 @@
+# Local-only reference material (historical, not part of the repo)
+qrac-ai-handoff/reference-first-gemini-conversation.txt
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+*.key
+signer-state*.json
+qrac-signer-*.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Remix / compiler output
+contracts/artifacts/
+contracts/.states/
+.deps/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
