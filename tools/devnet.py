@@ -227,6 +227,15 @@ def cmd_deploy(a):
     _, r = send_plain(s, None, bytes.fromhex(c["QRACFrameFactory"]["bin"]) + encode(["address"], [s["implementation"]]))
     s["factory"] = to_checksum_address(r["contractAddress"]); save(s)
     print("QRACFrameFactory", s["factory"], "gas", int(r["gasUsed"], 16))
+    # keep the dApp's frame page in sync (after a devnet reset, `deploy` is the only step needed)
+    path = os.path.join(ROOT, "apps", "web", "deployments.json")
+    known = json.load(open(path, encoding="utf-8"))
+    known.setdefault("1337", {}).update({"verifier": s["verifier"], "frameImplementation": s["implementation"],
+                                         "frameFactory": s["factory"]})
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(known, f, indent=1)
+        f.write("\n")
+    print("updated apps/web/deployments.json (chain 1337)")
 
 
 def cmd_mint(a):
