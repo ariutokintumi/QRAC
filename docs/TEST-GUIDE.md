@@ -34,22 +34,37 @@ What this proves: an ECDSA wallet only delivers and pays; the account only obeys
 
 ## 3. Future Ethereum · EIP-8141 frame transactions (no compromises)
 
-Top switch: **"Future Ethereum · EIP-8141 frame transactions (devnet)"**. **No wallet extension needed.** It uses the same seed; chain 1337 gets its own independent keys.
+Top switch: **"Future Ethereum · EIP-8141 frame transactions (devnet)"**.
 
-1. **Seed and setup wallet:** "loaded" → **Create devnet setup key** → **Get devnet ETH (faucet)** (1 ETH; the faucet allows once per hour per address).
-2. **Your frame account:** account number **2** (0 and 1 already exist in this browser's test run) → **Generate key tree** → **Mint account** → **Fund** 0.05. → minted, public key matches the seed, *not staked*.
-3. **Send a post-quantum frame transaction:** keep the defaults → **Sign with a one-time key and simulate**. You should see:
-   - signatures: **1 post-quantum (LMS, 2,508 bytes) · 0 ECDSA**;
-   - one-time key → nonce key, sequence 0;
-   - VERIFY frame (PQ check) **~250,000 gas · approved**;
-   - public mempool verdict: **not allowed** (prefix gas budget > 100,000);
-   - gas paid by **the account itself**.
-4. **Try the public (canonical) mempool** → **Rejected** ("exceeds MAX_VERIFY_GAS").
-5. **Submit to the alternative mempool** → **admitted, 17/17 admission checks passed**, then *On chain* with a block number → open the **Explorer** link: "On chain", "Admission report: Every rule passed".
-6. Optional: **Stake 0.012 ETH** (signed with the PQ key, delivered through the account's `submit()` path) → *staked* → send another frame transaction.
-7. **Activity:** every one-time key used, including rejected attempts.
+**About Brave Wallet:** it is not used on this page, by design. No wallet (Brave, MetaMask, …) can sign EIP-8141 frame transactions yet, and QRAC does not need one: the post-quantum key in the dApp signs, and the account pays its own gas. The only ECDSA key involved is a throwaway devnet **setup key** that the page creates to pay for minting, funding and the staking transaction; it never has any right over the account.
 
-What this proves: on Ethereum with frame transactions the same account needs **no ECDSA at all**, pays its own gas, and the protocol enforces one-time keys. The ~250k-gas post-quantum check only fits in the **alternative mempool**.
+1. **Seed and setup wallet:**
+   - The seed shows **loaded**: it is the same 24-word seed as the Sepolia page; chain 1337 derives its own independent keys.
+   - **Create devnet setup key** → **Get devnet ETH (faucet)** → the setup key shows **1.0 ETH** within a few seconds. The faucet allows once per hour per address; a new setup key is a new address.
+2. **Your frame account:**
+   - Account number **0** (any number not used before in this browser on this page).
+   - **Generate key tree** (1–4 s) → **Mint account** → the address shows *minted*, "Public key matches seed: yes", *not staked*.
+   - **Fund** 0.05 → Balance 0.05 ETH.
+3. **Send a post-quantum frame transaction** (keep the default recipient and amount) → **Sign with a one-time key and simulate**. You should see:
+   - Signatures in the transaction: **1 post-quantum (LMS, 2,508 bytes) · 0 ECDSA**.
+   - One-time key → nonce key: **#0 (epoch 0) → 1, sequence 0**.
+   - Simulation: **success**; VERIFY frame (PQ check) **~250,000 gas · approved**; SENDER frame 3,000 gas · ok.
+   - Public mempool verdict: **not allowed**: prefix gas budget exceeded … > 100000.
+   - Gas paid by: **the account itself**.
+4. **Try the public (canonical) mempool** → **"Rejected by the public (canonical) mempool … exceeds MAX_VERIFY_GAS"**.
+5. **Submit to the alternative mempool (ERC-8421)** → **admitted · 17/17 admission checks passed**, then **On chain · block … · success** (~10–20 s). Click the **Explorer** link: *On chain*, frame 0 *self-verification · payer*, **"Admission report: Every rule passed"**.
+6. Optional: **Stake 0.012 ETH** → *staked 0.012 ETH, unstake delay 86400s* (signed by the PQ key, delivered through the account's `submit()` path by the setup key) → repeat step 3 and step 5.
+7. **Activity:** every one-time key used, including the public-mempool attempt (that key is spent too, as it must be).
+
+What this proves: on Ethereum with frame transactions the same account needs **no ECDSA at all**, pays its own gas, and the protocol enforces its one-time keys. The ~250k-gas post-quantum check only fits in the **alternative mempool**.
+
+### Testing on a public domain
+
+The site is static (`apps/web`); upload the folder to any static host with HTTPS. Browser data is **per site**: on the new domain the seed and journal start empty.
+
+- **New seed:** Sepolia page → Setup → *Create new seed*.
+- **Or continue with your existing accounts:** Setup → *Import seed file…* (your `qrac-seed-….json`), then Manage → *Import journal…* (your latest `qrac-journal-….json`). The frame page uses the same seed and journal.
+- On the Sepolia page choose **Browser wallet** (the "Local dev node" option only works with `tools/devnode.py`).
 
 ## 4. Command line (the same Phase 3 story, scripted)
 

@@ -512,14 +512,24 @@ Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.p
 
 ### 7 Nov 2026 — Session 1, continued: feedback for the alt-mempool team, test guide
 
-**General prompt:** determine whether the "bug" found in the browser run was ours or theirs; collect every issue found in their docs, libraries and devnet, with reproduction steps, for the team's feedback; write a step-by-step test guide.
+**General prompt:** determine whether the "bug" found in the browser run was ours or theirs, and list, for the alt-mempool team, **only the errors we actually hit** during development and tests, saying for each whether the cause was ours or theirs (no generic audit of their materials). Write a step-by-step guide to test everything manually from the website.
 
-| # | Finding / decision | Status |
+**Errors we hit in Phase 3, and whose they were:**
+
+| Error we hit | Cause | Reported to them |
 |---|---|---|
-| F-3 | The funding "failure" in the frame-page run was **not our bug**. The devnet returns type-`0x06` frame transactions in standard `eth_getTransactionByHash` / `eth_getBlockByNumber(full)` responses without `gas`/`nonce`/`to`/`value`. **ethers 6.13.4 throws** on them (`invalid value for value.gasLimit … null`), including inside `tx.wait()` of ordinary transactions when a block contains a frame tx. **viem 2.21.32 silently returns undefined** `type`/`gas`/`nonce`. Receipts parse fine. Reproduced standalone. Our workaround (raw send + own polling) stays. | Verified |
-| F-4 | Spec divergence: EIP-8141 replaces elided signatures by their **byte length** in the signature hash; the devnet codecs use **empty bytes**. A transaction signed over the EIP-text hash is rejected live ("Invalid frame transaction signature"). | Verified live |
-| F-5 | The sidecar reports a replayed frame tx with the canonical gas-budget message instead of the real reason (nonce already used); source located at sidecar `2e22ff0`. | Verified + source located |
-| F-6 | Docs vs devnet: BUDGET-010 (100k unstaked) not enforced; "there is no faucet" although the gateway has one; npm vs yarn; exact `0.8.28` pragma in HegotaSupport. | Verified |
-| D-3.13 | All of the above, plus what worked well, written for the alt-mempool team with standalone reproduction steps: [`docs/FEEDBACK-ALT-MEMPOOL.md`](../docs/FEEDBACK-ALT-MEMPOOL.md). The F1 (viem) and F3 snippets were executed as written. | Done |
-| D-3.14 | `tools/devnet.py deploy` now also updates `apps/web/deployments.json` (chain 1337), so after a devnet reset a single command restores the frame page. | Done |
-| D-3.15 | Step-by-step test and demo guide for both modes, the CLI and the test suite: [`docs/TEST-GUIDE.md`](../docs/TEST-GUIDE.md). | Done |
+| Funding on the frame page reported "failed" by ethers but mined | **Theirs:** the devnet's standard RPC responses contain type-`0x06` frame transactions that ethers v6 cannot parse (`tx.wait()` read a block containing one) | Yes |
+| Replay of a mined frame tx rejected with an unrelated reason (gas budget) | **Theirs:** the sidecar reports the canonical violation before the real execution error (nonce already used) | Yes |
+| Unstaked account (~255k validation gas) admitted, contrary to the documented 100k budget | **Theirs:** docs vs devnet (budget not enforced) | Yes |
+| Devnet guide says "There is no faucet" (we planned to use the shared genesis key) | **Theirs:** docs; the gateway faucet exists | Yes |
+| Test helper parsed revert data wrongly; a test submitted to the wrong account; a guessed RPC method name | **Ours** | No |
+| (Sepolia) Brave Wallet's locked provider and its "could not coalesce" broadcast error | Brave Wallet + our handling | No (not the alt-mempool team) |
+
+| # | Decision | Status |
+|---|---|---|
+| D-3.13 | Feedback for the alt-mempool team limited to the four errors above, each with cause, workaround and standalone reproduction, plus a short "what worked well": [`docs/FEEDBACK-ALT-MEMPOOL.md`](../docs/FEEDBACK-ALT-MEMPOOL.md). Items found only by reading or probing their materials (signature-hash wording, npm/yarn, compiler pin, a viem check) were **removed**: they were not errors we hit. | Done |
+| D-3.14 | `tools/devnet.py deploy` also updates `apps/web/deployments.json` (chain 1337), so after a devnet reset a single command restores the frame page. | Done |
+| D-3.15 | Step-by-step manual test guide for the website (both modes), the CLI and the tests: [`docs/TEST-GUIDE.md`](../docs/TEST-GUIDE.md). Brave Wallet is used for the Sepolia mode only; the frame mode needs no wallet extension (no wallet supports EIP-8141 transactions yet; the PQ key signs and the account pays). | Done |
+| D-3.16 | Frame page: after mint or fund, wait until the RPC reflects the new block before refreshing (observed: the code lookup right after the mint receipt still returned empty for a few seconds, showing "not minted yet"). Banner states that no wallet extension is used on this page. | Done · Verified |
+
+**Fresh-site check (public-domain scenario):** on a new origin (static server, empty browser storage) the guide's frame steps work end to end: new seed → setup key + faucet → mint → fund → sign (1 PQ / 0 ECDSA, VERIFY 251,128 gas) → public mempool rejected → alternative mempool admitted 17/17, mined in block 8429 ([`0xc3c2c834…787914`](https://explorer.altmempool.wtf/tx/0xc3c2c834e5b86fe0e147791439973a1188bfed879024b70f2753c14153787914)).

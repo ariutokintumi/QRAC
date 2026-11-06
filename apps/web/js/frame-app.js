@@ -83,6 +83,15 @@ async function burnerSend({ to, data = '0x', value = 0n, gasLimit }) {
   throw new Error(`setup-key transaction ${hash} not mined yet: check the balance before retrying`);
 }
 
+/** The RPC can answer a read a moment before it reflects the block that holds our receipt: wait until it does. */
+async function waitFor(check, tries = 12) {
+  for (let i = 0; i < tries; i++) {
+    if (await check().catch(() => false)) return true;
+    await new Promise((ok) => setTimeout(ok, 1500));
+  }
+  return false;
+}
+
 const accountContract = (addr, runner) => new E.Contract(addr, S.art.account.abi, runner || S.provider);
 const factory = (runner) => new E.Contract(S.D.frameFactory, S.art.factory.abi, runner || S.provider);
 const currentId = () => J.accountId(CHAIN, Number($('fIndex').value || 0));
@@ -210,13 +219,17 @@ $('btnFMint').onclick = () => guard('Mint', async () => {
   if (!a) throw new Error('generate the key tree first');
   const r = await burnerSend({ to: S.D.frameFactory, data: factory().interface.encodeFunctionData('mint', [a.trees[0].publicKey]) });
   log(`Minted (gas ${r.gasUsed}): tx ${r.hash}`);
+  const addr = await factory().predictAddress(a.trees[0].publicKey);
+  await waitFor(async () => (await rpc(S.D.executionRpc, 'eth_getCode', [addr, 'latest'])) !== '0x');
   await refresh();
 });
 $('btnFFund').onclick = () => guard('Fund', async () => {
   const a = currentAccount();
   if (!a?.address) throw new Error('mint the account first');
+  const before = BigInt(await rpc(S.D.executionRpc, 'eth_getBalance', [a.address, 'latest']));
   const r = await burnerSend({ to: a.address, value: E.parseEther($('fFund').value || '0'), gasLimit: 100000n });
   log(`Funded account: ${r.hash}`);
+  await waitFor(async () => BigInt(await rpc(S.D.executionRpc, 'eth_getBalance', [a.address, 'latest'])) > before);
   await refresh();
 });
 
