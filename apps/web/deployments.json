@@ -17,6 +17,7 @@
   "altMempoolRpc": "https://altmempoolgateway.forshtat.com/rpc",
   "explorer": "https://explorer.altmempool.wtf/tx/",
   "stakingRegistry": "0xd51c04d7a0b01124e84de152f4e56d9eecb22d2f",
-  "note": "Throwaway devnet: may be reset. Evidence: deployments/1337.md"
+  "note": "Throwaway devnet: may be reset. Evidence: deployments/1337.md",
+  "altMempoolRpcMiner": "https://altmempool.forshtat.com/rpc"
  }
 }

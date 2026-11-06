@@ -153,12 +153,13 @@ async function useSeed(m, how) {
   log(`${how}. Stored in this browser (developer mode).`);
 }
 
-$('btnNewSeed').onclick = () => guard('Create seed', async () => {
+async function newSeed() {
   if (S.mnemonic && !confirm('Replace the current seed in this browser?')) return;
   await useSeed(generateMnemonic(S.words), 'New 24-word seed created');
   downloadSeedFile();
   log('Seed file downloaded (keep it secret; you need it to restore).');
-});
+}
+$('btnNewSeed').onclick = () => guard('Create seed', newSeed);
 $('btnDownloadSeed').onclick = () => downloadSeedFile();
 $('btnShowImport').onclick = () => $('importBox').classList.toggle('hidden');
 $('btnImportSeed').onclick = () => guard('Import', async () => {
@@ -166,9 +167,7 @@ $('btnImportSeed').onclick = () => guard('Import', async () => {
   $('importWords').value = '';
   log('For accounts with past activity, also import your latest journal before signing.');
 });
-$('fileSeed').onchange = (ev) => guard('Import seed file', async () => {
-  const f = ev.target.files[0];
-  if (!f) return;
+async function importSeedFile(f) {
   const text = (await f.text()).trim();
   let m = text;
   if (text.startsWith('{')) {
@@ -176,9 +175,14 @@ $('fileSeed').onchange = (ev) => guard('Import seed file', async () => {
     if (data.qrac !== 'seed-v1' || !data.mnemonic) throw new Error('not a QRAC.me seed file');
     m = data.mnemonic;
   }
-  ev.target.value = '';
   await useSeed(m, `Seed imported from ${f.name}`);
   log('For accounts with past activity, also import your latest journal before signing.');
+}
+$('fileSeed').onchange = (ev) => guard('Import seed file', async () => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  ev.target.value = '';
+  await importSeedFile(f);
 });
 $('btnRevealSeed').onclick = () => {
   const el = $('revealWords');
@@ -404,10 +408,9 @@ $('acctSelect').onchange = () => {
   refresh();
 };
 
-$('btnGenTree').onclick = () => guard('Key generation', async () => {
+async function genTree(idx) {
   requireConnected();
   requireSeed();
-  const idx = Number($('acctIndex').value);
   if (!Number.isInteger(idx) || idx < 0) throw new Error('account number must be 0 or more');
   const id = J.accountId(S.chainId, idx);
   $('treeStatus').textContent = 'Building 1,024 one-time keys in a background worker…';
@@ -422,7 +425,9 @@ $('btnGenTree').onclick = () => guard('Key generation', async () => {
   $('treeStatus').textContent = `Account #${idx}: key tree ready. Public key below.`;
   renderAccountSelect();
   $('pubKeyOut').value = tree.publicKey;
-});
+  return id;
+}
+$('btnGenTree').onclick = () => guard('Key generation', () => genTree(Number($('acctIndex').value)));
 
 $('btnDeployAccount').onclick = () => guard('Deploy account', async () => {
   requireConnected();
@@ -437,7 +442,7 @@ $('btnDeployAccount').onclick = () => guard('Deploy account', async () => {
   await attach(await c.getAddress());
 });
 
-$('btnMint').onclick = () => guard('Mint', async () => {
+async function mintCurrent() {
   requireConnected();
   const a = currentAccount();
   if (!a) throw new Error('generate a key tree first');
@@ -453,7 +458,9 @@ $('btnMint').onclick = () => guard('Mint', async () => {
     log(`Account ${predicted} was already minted; attaching.`);
   }
   await attach(predicted);
-});
+  return predicted;
+}
+$('btnMint').onclick = () => guard('Mint', mintCurrent);
 
 async function attach(address) {
   requireConnected();
@@ -520,14 +527,15 @@ async function refresh() {
   await renderTokens(a);
 }
 $('btnRefresh').onclick = () => guard('Refresh', refresh);
-$('btnFund').onclick = () => guard('Funding', async () => {
+async function fundCurrent(amount) {
   const a = requireAttached();
-  const amount = $('fundAmount').value.trim() || '0';
-  const tx = await S.signer.sendTransaction({ to: a.address, value: E.parseEther(amount) });
+  const tx = await S.signer.sendTransaction({ to: a.address, value: E.parseEther(amount || '0') });
   log(`Funding tx ${tx.hash}`);
   await tx.wait();
   await refresh();
-});
+  return tx.hash;
+}
+$('btnFund').onclick = () => guard('Funding', () => fundCurrent($('fundAmount').value.trim() || '0'));
 
 async function renderTokens(a) {
   const list = S.settings.tokens?.[a.id] || [];
@@ -855,7 +863,7 @@ async function renderActivity() {
     loadWordlist(),
     fetch('artifacts/LMSVerifier.json').then((r) => r.json()),
     fetch('artifacts/QRACAccount.json').then((r) => r.json()),
-    fetch('deployments.json').then((r) => r.json()).catch(() => ({})),
+    fetch('deployments.json', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
   ]);
   S.known = known;
   S.artFactory = await fetch('artifacts/QRACFactory.json').then((r) => r.json());
@@ -872,5 +880,52 @@ async function renderActivity() {
     $('localSignerBox').classList.remove('hidden');
   }
   window.QRAC = { S, J }; // for debugging in the console
+  window.QRACAPI = {
+    state: async () => {
+      const a = currentAccount();
+      const j = J.loadJournal();
+      const accounts = S.chainId ? Object.values(j.accounts).filter((x) => x.chainId === S.chainId) : [];
+      let balance = null;
+      if (S.provider && a?.address) balance = await S.provider.getBalance(a.address).catch(() => null);
+      const t = a?.trees?.[a.currentEpoch];
+      return {
+        hasSeed: !!S.bip39Seed, connected: !!(S.provider && S.chainId), chainId: S.chainId, submitter: S.submitter,
+        hasWallet: !!window.ethereum, factory: factoryAddress(), account: a, accounts, balance,
+        keysLeft: t ? Math.max(0, CAPACITY - J.RENEWAL_RESERVE - t.nextLeaf) : null,
+        log: j.log.filter((e) => a && e.accountId === a.id).slice().reverse(),
+      };
+    },
+    newSeed, importSeedFile, downloadSeedFile,
+    connectWallet: async () => {
+      $('netMode').value = window.ethereum ? 'injected' : (location.port === '8545' ? 'local' : 'injected');
+      $('netMode').dispatchEvent(new Event('change'));
+      await connect();
+    },
+    nextIndex: () => {
+      const used = Object.values(J.loadJournal().accounts).filter((x) => x.chainId === S.chainId).map((x) => x.accountIndex);
+      return used.length ? Math.max(...used) + 1 : 0;
+    },
+    selectAccount: async (id) => { S.current = id; renderAccountSelect(); await refresh(); },
+    genTree, mintCurrent, fundCurrent, refresh, explain,
+    /** Send ETH from the current account: review (encoding checked against the contract), sign, submit. */
+    sendEth: async (to, amountEth, onStep = () => {}) => {
+      const target = E.getAddress(to);
+      const value = E.parseEther(String(amountEth));
+      const call = { target, value, data: '0x', checkReturn: false, label: `Send ${E.formatEther(value)} ETH to ${target}` };
+      onStep('review');
+      await prepare(enc.KIND.EXECUTE, enc.executePayload([call]), call.label, [call]);
+      onStep('sign');
+      const entry = await signPending();
+      S.pending = null;
+      onStep('submit', entry);
+      await submitAuthorization(entry, entry.id);
+      const done = J.loadJournal().log.find((x) => x.id === entry.id);
+      onStep('done', done);
+      return done;
+    },
+    explorerTx: (h) => (EXPLORERS[S.chainId] ? `${EXPLORERS[S.chainId]}/tx/${h}` : null),
+    explorerAddress: (a) => (EXPLORERS[S.chainId] ? `${EXPLORERS[S.chainId]}/address/${a}` : null),
+  };
+  window.dispatchEvent(new Event('qrac:ready'));
   log('Ready.');
 })().catch((e) => log('Startup failed: ' + explain(e)));

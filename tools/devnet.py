@@ -46,6 +46,7 @@ from qrac.evm import calldata, compile_contracts  # noqa: E402
 CHAIN_ID = 1337
 EL_RPC = "https://altmempool.forshtat.com"                 # ethrex (canonical rules, plain transactions)
 ALT_RPC = "https://altmempoolgateway.forshtat.com/rpc"     # ERC-8421 sidecar gateway (standard alt mempool)
+ALT_MINER_RPC = "https://altmempool.forshtat.com/rpc"     # the miner's sidecar: submit here first (gateway gossip can stall)
 EXPLORER = "https://explorer.altmempool.wtf/"
 STAKING_REGISTRY = "0xd51c04d7a0b01124e84de152f4e56d9eecb22d2f"
 STAKE_WEI = 12 * 10**15            # 0.012 ETH, above the devnet minStake of 0.01 ETH
@@ -295,14 +296,19 @@ def cmd_send(a):
         if a.route == "canonical":
             res = rpc(EL_RPC, "eth_sendRawTransaction", ["0x" + tx.raw().hex()])
         else:
-            res = rpc(ALT_RPC, "eth_sendFrameTransaction", [tx.wire()])
+            try:
+                res = rpc(ALT_MINER_RPC, "eth_sendFrameTransaction", [tx.wire()])
+            except RpcError:
+                raise
+            except Exception:  # network problem with the miner's sidecar: use the gateway
+                res = rpc(ALT_RPC, "eth_sendFrameTransaction", [tx.wire()])
     except RpcError as e:
         note(s, leaf, result="rejected", error=e.err)
         print(f"REJECTED by the {a.route} mempool:", json.dumps(e.err)[:800])
         return
     print(f"ACCEPTED by the {a.route} mempool: {res}")
     note(s, leaf, result="accepted", submitted_hash=res, wire=tx.wire())
-    r = wait_receipt(res, ALT_RPC if a.route == "alt" else EL_RPC)
+    r = wait_receipt(res, EL_RPC)
     print("mined in block", int(r["blockNumber"], 16), "status", r["status"], "gasUsed", int(r.get("gasUsed", "0x0"), 16))
     note(s, leaf, block=int(r["blockNumber"], 16), status=r["status"])
     print("explorer:", EXPLORER, "(search", res, ")")

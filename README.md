@@ -1,3 +1,5 @@
+<p align="center"><img src="apps/web/assets/brand/logo-192.png" width="120" alt="QRAC.me logo"></p>
+
 # QRAC.me (QR Accounts)
 
 Post-quantum accounts for Ethereum that you can use today, and that already work with EIP-8141 frame transactions.
@@ -67,7 +69,7 @@ Use it at [qrac.me](https://qrac.me), or run the same site locally:
 py -m http.server 8080 --directory apps/web
 ```
 
-Open http://localhost:8080. The switch at the top has two modes:
+Open http://localhost:8080. It opens in User mode, a simple wallet with a short wizard. The Dev / User switch at the top right shows the full interface (Dev mode) with every option; both share the same seed and accounts. In Dev mode there are two pages:
 
 - **Current Ethereum · Sepolia:** create a seed, connect Brave Wallet or MetaMask, mint an account, fund it and send a PQ-signed action.
 - **Future Ethereum · EIP-8141 frame transactions:** no wallet extension needed. Create a devnet setup key, use the faucet, mint, fund, sign, and compare the public mempool (rejected) with the alternative mempool (admitted).

@@ -10,7 +10,7 @@ From the repository folder:
 py -m http.server 8080 --directory apps/web
 ```
 
-Open http://localhost:8080. Both modes run from here. The same site is online at https://qrac.me, where you can follow the same steps.
+Open http://localhost:8080. The site opens in **User mode**, a simple wallet. The switch at the top right (Dev / User) changes to **Dev mode**, which shows every step and every option. Both modes share the same seed, journal and accounts, and the choice is remembered. Sections 3 and 4 use Dev mode. The same site is online at https://qrac.me, where you can follow the same steps.
 
 (Optional: `.venv\Scripts\python tools/devnode.py` serves the same dApp on port 8545 with an offline local chain, for the "Local dev node" option of the Sepolia page.)
 
@@ -18,7 +18,30 @@ Open http://localhost:8080. Both modes run from here. The same site is online at
 
 Open `/test.html`. You should see "All 11 checks passed". It checks that this browser computes SHA-256, LMS (including the official RFC 8554 Test Case 2), BIP-39, key derivation, the authorization message and the frame transaction encoding exactly like the Python references.
 
-## 2. Current Ethereum, Sepolia (today)
+## 2. User mode (the simple wallet)
+
+Two tabs at the top of the card: "Today · Sepolia" and "Future · EIP-8141". Each one walks you through a short wizard, then shows the wallet.
+
+**Today · Sepolia** (needs Brave Wallet or MetaMask on Sepolia with a bit of test ETH):
+
+1. "Your quantum-safe key": click "Create my key" (a secret `qrac-seed-….json` file downloads), or "I already have a key file".
+2. "Connect a wallet to pay gas": click "Connect wallet". If the wallet is on another network you see "Switch to Sepolia"; switch in the wallet and click "I switched, reconnect".
+3. "Create your account": click "Create my account". It builds the 1,024 keys and mints the account (your wallet confirms about 740k gas). The "Add funds" panel opens: put 0.05 and confirm.
+4. The wallet: balance, your address (click to copy) and Send / Receive / Add funds. Send 0.01 to any address with "Sign and send": the progress shows the review, the post-quantum signature, the delivery by your wallet and the confirmation with its Etherscan link. The "one-time keys left" badge goes down by one.
+
+**Future · EIP-8141** (no wallet extension):
+
+1. Same key as the other tab (or create one).
+2. "Free devnet gas": click "Get free devnet gas". It creates the throwaway setup key and uses the faucet.
+3. "Create your account": click "Create my account". It builds the keys, mints the account and adds 0.05 devnet ETH.
+4. The wallet shows the badges "Zero ECDSA" and "Pays its own gas". Send 0.001 with "Sign and send". The progress shows: signed (0 ECDSA signatures), simulated validation gas, public mempool rejected, alternative mempool admitted (17/17), and on chain with the block number and the explorer link. It takes 10 to 40 seconds.
+5. Optional: "Stake 0.012 ETH for the alternative mempool". The badge "Staked" appears.
+
+"Advanced options (Dev mode)" at the bottom of the card, or the switch, takes you to the full interface with the same account.
+
+## 3. Current Ethereum, Sepolia (today)
+
+In Dev mode (switch at the top right).
 
 Click "Current Ethereum · Sepolia" at the top. You need Brave Wallet or MetaMask on Sepolia with a bit of test ETH.
 
@@ -34,7 +57,9 @@ Click "Current Ethereum · Sepolia" at the top. You need Brave Wallet or MetaMas
 
 This shows that an ECDSA wallet only delivers and pays, and that the account only obeys the post-quantum signature.
 
-## 3. Future Ethereum, EIP-8141 frame transactions (devnet)
+## 4. Future Ethereum, EIP-8141 frame transactions (devnet)
+
+In Dev mode.
 
 Click "Future Ethereum · EIP-8141 frame transactions (devnet)" at the top.
 
@@ -63,7 +88,7 @@ The site is static (the `apps/web` folder). Browser data is kept per site, so on
 - To keep using your existing accounts: Setup, "Import seed file…" (your `qrac-seed-….json`), then Manage, "Import journal…" (your latest `qrac-journal-….json`). The frame page uses the same seed and journal.
 - On the Sepolia page choose "Browser wallet". "Local dev node" only works with `tools/devnode.py`.
 
-## 4. Command line (same frame-transaction story)
+## 5. Command line (same frame-transaction story)
 
 The devnet state of the original runs is in `.devnet/` (git-ignored) on this computer.
 
@@ -91,7 +116,7 @@ Expected: four attacks (replay, tampering, wrong nonce key, ECDSA-only drain), t
 
 If the devnet was reset (contracts gone), run `fund` and then `deploy`. `deploy` also updates `apps/web/deployments.json`, so the frame page follows. Then `mint`, `send`, and so on.
 
-## 5. Automated tests
+## 6. Automated tests
 
 ```bash
 .venv\Scripts\python tools/run_tests.py

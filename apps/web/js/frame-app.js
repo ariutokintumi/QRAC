@@ -1,7 +1,7 @@
 // QRAC.me on the EIP-8141 frame-transaction devnet (Phase 3). Separate page; the Sepolia app (app.js) is untouched.
 // Shares the seed, key derivation, LMS and the signer journal with it.
 import * as E from './eth.js';
-import { mnemonicToSeed } from './bip39.js';
+import { mnemonicToSeed, loadWordlist, generateMnemonic, mnemonicToEntropy, normalizeMnemonic } from './bip39.js';
 import { deriveTree } from './derive.js';
 import * as lms from './lms.js';
 import * as enc from './encoding.js';
@@ -122,13 +122,14 @@ async function renderBurner() {
   $('burnerInfo').innerHTML = `<dt>Setup key (devnet only)</dt><dd><code>${S.burner.address}</code> · ${E.formatEther(bal)} ETH</dd>`;
 }
 
-$('btnBurner').onclick = () => guard('Create setup key', async () => {
-  if (localStorage.getItem(BURNER_KEY) && !confirm('Replace the devnet setup key?')) return;
+async function createBurner(ask = true) {
+  if (ask && localStorage.getItem(BURNER_KEY) && !confirm('Replace the devnet setup key?')) return;
   localStorage.setItem(BURNER_KEY, E.Wallet.createRandom().privateKey);
   await renderBurner();
   log('Devnet setup key created (throwaway, stored in this browser).');
-});
-$('btnFaucet').onclick = () => guard('Faucet', async () => {
+}
+$('btnBurner').onclick = () => guard('Create setup key', () => createBurner(true));
+async function faucet() {
   if (!S.burner) throw new Error('create the devnet setup key first');
   const before = await S.provider.getBalance(S.burner.address);
   const res = await rpc(S.D.altMempoolRpc, 'skandha_explorer_faucet', [S.burner.address]);
@@ -138,7 +139,8 @@ $('btnFaucet').onclick = () => guard('Faucet', async () => {
     if ((await S.provider.getBalance(S.burner.address)) > before) break;
   }
   await renderBurner();
-});
+}
+$('btnFaucet').onclick = () => guard('Faucet', faucet);
 
 // ------------------------------------------------------------------------------------------- key tree + account
 
@@ -173,8 +175,8 @@ async function getTree(idx, epoch) {
   return tree;
 }
 
-$('btnFTree').onclick = () => guard('Key generation', async () => {
-  const idx = Number($('fIndex').value || 0);
+async function treeFor(idx) {
+  $('fIndex').value = String(idx);
   const tree = await getTree(idx, 0);
   await J.withJournal((j) => {
     j.accounts[J.accountId(CHAIN, idx)] ??= {
@@ -183,7 +185,8 @@ $('btnFTree').onclick = () => guard('Key generation', async () => {
     };
   });
   await refresh();
-});
+}
+$('btnFTree').onclick = () => guard('Key generation', () => treeFor(Number($('fIndex').value || 0)));
 
 async function refresh() {
   const a = currentAccount();
@@ -214,7 +217,7 @@ async function refresh() {
 $('btnFRefresh').onclick = () => guard('Refresh', refresh);
 $('fIndex').onchange = () => refresh().catch((e) => log(explain(e)));
 
-$('btnFMint').onclick = () => guard('Mint', async () => {
+async function mint() {
   const a = currentAccount();
   if (!a) throw new Error('generate the key tree first');
   const r = await burnerSend({ to: S.D.frameFactory, data: factory().interface.encodeFunctionData('mint', [a.trees[0].publicKey]) });
@@ -222,16 +225,20 @@ $('btnFMint').onclick = () => guard('Mint', async () => {
   const addr = await factory().predictAddress(a.trees[0].publicKey);
   await waitFor(async () => (await rpc(S.D.executionRpc, 'eth_getCode', [addr, 'latest'])) !== '0x');
   await refresh();
-});
-$('btnFFund').onclick = () => guard('Fund', async () => {
+  return addr;
+}
+$('btnFMint').onclick = () => guard('Mint', mint);
+async function fund(amount) {
   const a = currentAccount();
   if (!a?.address) throw new Error('mint the account first');
   const before = BigInt(await rpc(S.D.executionRpc, 'eth_getBalance', [a.address, 'latest']));
-  const r = await burnerSend({ to: a.address, value: E.parseEther($('fFund').value || '0'), gasLimit: 100000n });
+  const r = await burnerSend({ to: a.address, value: E.parseEther(amount || '0'), gasLimit: 100000n });
   log(`Funded account: ${r.hash}`);
   await waitFor(async () => BigInt(await rpc(S.D.executionRpc, 'eth_getBalance', [a.address, 'latest'])) > before);
   await refresh();
-});
+  return r.hash;
+}
+$('btnFFund').onclick = () => guard('Fund', () => fund($('fFund').value || '0'));
 
 // ------------------------------------------------------------------------------------------- one-time keys
 
@@ -250,7 +257,7 @@ async function reserve(a, epoch, meta) {
 
 // ------------------------------------------------------------------------------------------- stake (Phase 1 path)
 
-$('btnFStake').onclick = () => guard('Stake', async () => {
+async function stake() {
   const a = currentAccount();
   if (!a?.address) throw new Error('mint the account first');
   if (!S.burner) throw new Error('the setup key relays this transaction: create and fund it first');
@@ -271,18 +278,20 @@ $('btnFStake').onclick = () => guard('Stake', async () => {
   await J.updateEntry(entry.id, { status: 'confirmed', txHash: r.hash, gasUsed: r.gasUsed.toString() });
   log(`Staked through submit(): ${r.hash} (gas ${r.gasUsed})`);
   await refresh();
-});
+  return r.hash;
+}
+$('btnFStake').onclick = () => guard('Stake', stake);
 
 // ------------------------------------------------------------------------------------------- frame transactions
 
-$('btnFSign').onclick = () => guard('Sign', async () => {
+async function signFrame(toStr, amountStr) {
   const a = currentAccount();
   if (!a?.address) throw new Error('mint and fund the account first');
   const c = accountContract(a.address);
   const epoch = Number(await c.epoch());
   if (!a.trees[epoch]) throw new Error(`no local key tree for epoch ${epoch}`);
-  const to = E.getAddress($('fTo').value.trim());
-  const value = E.parseEther($('fAmount').value.trim() || '0');
+  const to = E.getAddress(String(toStr).trim());
+  const value = E.parseEther(String(amountStr).trim() || '0');
   const entry = await reserve(a, epoch, { kind: 1, frame: true, nonce: 'n/a',
     summary: `frame tx: send ${E.formatEther(value)} ETH to ${to}` });
   const tx = {
@@ -319,36 +328,54 @@ $('btnFSign').onclick = () => guard('Sign', async () => {
     <dt>Gas paid by</dt><dd>${sim.payer ? `<code>${sim.payer}</code> (the account itself)` : 'n/a'}</dd></dl>`;
   $('fSubmitRow').classList.remove('hidden');
   $('fResult').innerHTML = '';
-});
+  return { leaf: entry.leaf, epoch, nonceKey: tx.nonceKeys[0], sigBytes: sig.length, sim, hash: F.txHash(tx) };
+}
+$('btnFSign').onclick = () => guard('Sign', () => signFrame($('fTo').value, $('fAmount').value));
 
-$('btnFCanon').onclick = () => guard('Public mempool', async () => {
+async function submitCanonical() {
   if (!S.tx) throw new Error('sign first');
   try {
     const h = await rpc(S.D.executionRpc, 'eth_sendRawTransaction', [F.raw(S.tx)]);
     $('fResult').innerHTML = `<p><span class="pill warn">accepted by the public mempool</span> ${esc(h)}</p>`;
+    return { rejected: false, hash: h };
   } catch (e) {
     $('fResult').innerHTML = `<p><span class="pill bad">Rejected by the public (canonical) mempool</span> ${esc(explain(e))}</p>
       <p class="small muted">The post-quantum check needs ~250k gas of validation; the public mempool allows 100k.
       The same signed transaction can still be submitted to the alternative mempool.</p>`;
     log(`Public mempool rejected the frame tx: ${explain(e)}`);
+    return { rejected: true, reason: explain(e) };
   }
-});
+}
+$('btnFCanon').onclick = () => guard('Public mempool', submitCanonical);
 
-$('btnFAlt').onclick = () => guard('Alternative mempool', async () => {
+async function submitAlt(onStep = () => {}) {
   if (!S.tx) throw new Error('sign first');
-  let hash;
-  try {
-    hash = await rpc(S.D.altMempoolRpc, 'eth_sendFrameTransaction', [F.wire(S.tx)]);
-  } catch (e) {
-    await J.updateEntry(S.entryId, { status: 'rejected', note: explain(e) });
-    throw e;
+  // Submit to the miner's sidecar first (the devnet guide's mempool RPC), the gateway as fallback.
+  // Observed on the devnet: gateway-to-miner gossip stalled and transactions sent only to the gateway were never mined.
+  const sidecars = [S.D.altMempoolRpcMiner, S.D.altMempoolRpc].filter(Boolean);
+  let hash, admittedBy, lastErr;
+  for (const url of sidecars) {
+    try {
+      hash = await rpc(url, 'eth_sendFrameTransaction', [F.wire(S.tx)]);
+      admittedBy = url;
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (e.rpc) break; // a validation verdict: every sidecar applies the same rules
+    }
   }
+  if (!hash) {
+    await J.updateEntry(S.entryId, { status: 'rejected', note: explain(lastErr) });
+    throw lastErr;
+  }
+  for (const url of sidecars) if (url !== admittedBy) rpc(url, 'eth_sendFrameTransaction', [F.wire(S.tx)]).catch(() => {});
   await J.updateEntry(S.entryId, { status: 'submitted', txHash: hash });
+  onStep('admitted', hash);
   $('fResult').innerHTML = `<p><span class="pill ok">Admitted by the alternative mempool</span> ${txLink(hash)} · waiting for a block…</p>`;
   let r = null;
-  for (let i = 0; i < 40 && !r; i++) { await new Promise((ok) => setTimeout(ok, 3000)); r = await rpc(S.D.altMempoolRpc, 'eth_getTransactionReceipt', [hash]).catch(() => null); }
+  for (let i = 0; i < 40 && !r; i++) { await new Promise((ok) => setTimeout(ok, 3000)); r = await rpc(S.D.executionRpc, 'eth_getTransactionReceipt', [hash]).catch(() => null); }
   let checks = [];
-  try { const rep = await rpc(S.D.altMempoolRpc, 'skandha_explorer_getTransaction', [hash]); checks = rep?.admission?.checks || []; } catch { /* explorer API optional */ }
+  try { const rep = await rpc(admittedBy, 'skandha_explorer_getTransaction', [hash]); checks = rep?.admission?.checks || []; } catch { /* explorer API optional */ }
   const passed = checks.filter((c) => c.verdict === 'pass').length;
   await J.updateEntry(S.entryId, { status: r && r.status === '0x1' ? 'confirmed' : 'reverted', block: r ? Number(r.blockNumber) : null });
   $('fResult').innerHTML = `<dl class="kv">
@@ -359,7 +386,9 @@ $('btnFAlt').onclick = () => guard('Alternative mempool', async () => {
   S.tx = null;
   $('fSubmitRow').classList.add('hidden');
   await refresh();
-});
+  return { hash, receipt: r, passed, checks: checks.length, explorer: `${S.D.explorer}${hash}` };
+}
+$('btnFAlt').onclick = () => guard('Alternative mempool', () => submitAlt());
 
 function renderActivity() {
   const list = J.loadJournal().log.filter((e) => e.accountId?.startsWith(`${CHAIN}:`)).slice().reverse();
@@ -373,7 +402,7 @@ function renderActivity() {
 
 (async () => {
   const [known, acc, fac] = await Promise.all([
-    fetch('deployments.json').then((r) => r.json()),
+    fetch('deployments.json', { cache: 'no-store' }).then((r) => r.json()),
     fetch('artifacts/QRACFrameAccount.json').then((r) => r.json()),
     fetch('artifacts/QRACFrameFactory.json').then((r) => r.json()),
   ]);
@@ -388,5 +417,63 @@ function renderActivity() {
   await renderBurner();
   await refresh();
   window.QRACF = { S, J, F };
+  window.QRACFAPI = {
+    state: async () => {
+      const a = currentAccount();
+      const j = J.loadJournal();
+      const accounts = Object.values(j.accounts).filter((x) => x.chainId === CHAIN);
+      let balance = null, staked = false, minted = false, address = null;
+      if (a) {
+        address = await factory().predictAddress(a.trees[0].publicKey);
+        minted = (await rpc(S.D.executionRpc, 'eth_getCode', [address, 'latest'])) !== '0x';
+        balance = BigInt(await rpc(S.D.executionRpc, 'eth_getBalance', [address, 'latest']));
+        if (minted) {
+          const dep = await rpc(S.D.executionRpc, 'eth_call', [{ to: S.D.stakingRegistry,
+            data: new E.Interface(['function getDepositInfo(address)']).encodeFunctionData('getDepositInfo', [address]) }, 'latest']);
+          const [amount, , withdrawTime] = E.AbiCoder.defaultAbiCoder().decode(['uint256', 'uint256', 'uint256'], E.dataSlice(dep, 0, 96));
+          staked = amount > 10n ** 16n && withdrawTime === 0n;
+        }
+      }
+      const burnerBalance = S.burner ? await S.provider.getBalance(S.burner.address) : 0n;
+      const t = a?.trees?.[0];
+      return {
+        hasSeed: !!S.seed64, burner: S.burner?.address || null, burnerBalance, account: a, accounts, address, minted,
+        balance, staked, keysLeft: t ? Math.max(0, CAPACITY - J.RENEWAL_RESERVE - t.nextLeaf) : null,
+        log: j.log.filter((e) => a && e.accountId === a.id).slice().reverse(),
+      };
+    },
+    newSeed: async () => {
+      const words = await loadWordlist();
+      const m = generateMnemonic(words);
+      J.saveMnemonic(m);
+      await renderSeed();
+      const fp = E.keccak256(S.seed64).slice(0, 18);
+      const file = { qrac: 'seed-v1', warning: 'SECRET. Whoever has this file controls the QRAC.me accounts derived from it. Test networks only.',
+        mnemonic: m, words: 24, bip39Passphrase: '', fingerprint: fp, createdAt: new Date().toISOString() };
+      J.downloadBlob(new Blob([JSON.stringify(file, null, 1)], { type: 'application/json' }), `qrac-seed-${fp.slice(2, 10)}.json`);
+    },
+    importSeedFile: async (f) => {
+      const words = await loadWordlist();
+      const text = (await f.text()).trim();
+      let m = text;
+      if (text.startsWith('{')) {
+        const d = JSON.parse(text);
+        if (d.qrac !== 'seed-v1' || !d.mnemonic) throw new Error('not a QRAC.me seed file');
+        m = d.mnemonic;
+      }
+      m = normalizeMnemonic(m);
+      mnemonicToEntropy(m, words);
+      J.saveMnemonic(m);
+      await renderSeed();
+    },
+    selectIndex: async (idx) => { $('fIndex').value = String(idx); await refresh(); },
+    nextIndex: () => {
+      const used = Object.values(J.loadJournal().accounts).filter((x) => x.chainId === CHAIN).map((x) => x.accountIndex);
+      return used.length ? Math.max(...used) + 1 : 0;
+    },
+    createBurner, faucet, treeFor, mint, fund, stake, signFrame, submitCanonical, submitAlt, refresh, explain,
+    explorerTx: (h) => `${S.D.explorer}${h}`,
+  };
+  window.dispatchEvent(new Event('qrac:ready'));
   log('Ready (frame-transaction devnet).');
 })().catch((e) => log('Startup failed: ' + explain(e)));

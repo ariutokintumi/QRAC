@@ -10,6 +10,7 @@ Versions at the time: ethrex `v23.0.0-eip8141-tracer-9aa3645d`, sidecar `forshta
 | 2 | Replaying a mined frame transaction was rejected with an **unrelated reason** (gas budget) | Sidecar reports the canonical-mempool violation before the real execution error | Checked `ethrex_simulateFrameTransaction` to find the real reason |
 | 3 | Our **unstaked** account (~255k validation gas) was **admitted**, although the docs say unstaked entities get 100k | The devnet sidecar does not enforce the per-entity budget (BUDGET-010) | None needed; we stake anyway and documented the difference |
 | 4 | The devnet guide says **"There is no faucet"** and to fund from the shared genesis key | The gateway does have a faucet (`skandha_explorer_faucet`), and the workshop uses it | Used the faucet (never needed the shared key) |
+| 5 | Frame transactions sent to the gateway were **admitted but never mined** (status stayed `New`) | The gateway did not pass them on to the miner sidecar, which did not know the hash | Submit to the miner sidecar first, the gateway only as a fallback |
 
 ---
 
@@ -68,6 +69,21 @@ await rpc(GW, 'eth_sendFrameTransaction', [rep.result.entry.tx]); // -> "prefix 
 
 **What happened.** The devnet guide says "There is no faucet" and to fund a new key from the shared genesis key. While reading the workshop code we found `skandha_explorer_faucet(address)` on the gateway (1 ETH, once per hour per address), which `step_1_check` uses. We used it instead of the shared key. The guide also does not list the gateway endpoint (`https://altmempoolgateway.forshtat.com/rpc`) that the workshop sends everything through.
 
+## 5. Admitted by the gateway, never mined
+
+**What happened.** In the evening of 7 Nov 2026, frame transactions we sent to the gateway (`https://altmempoolgateway.forshtat.com/rpc`) were admitted as usual (17/17 checks) and then stayed in status `New`. New blocks kept coming and none of them included ours. At that moment:
+
+- `skandha_frameTransactionStatus` on the gateway: `New`, with the gateway pool growing (10 entries);
+- the same call on the miner sidecar (`https://altmempool.forshtat.com/rpc`): `Frame transaction not found`.
+
+Sending the same raw transaction to the miner sidecar got it mined within seconds (blocks 9021 and 9046). Earlier that day the gateway alone had worked every time.
+
+**Cause (from the outside).** The gossip from the gateway to the miner sidecar seems to have stalled. We cannot see the sidecar logs, so this is what the two endpoints showed, not a diagnosis.
+
+**Our workaround.** The dApp and `tools/devnet.py` now submit to the miner sidecar first, fall back to the gateway, and also hand the transaction to the other endpoint in the background. Receipts are read from the execution RPC. The next full run went from signing to "On chain" in 43 seconds (block 9056).
+
+**Suggestion:** document the miner sidecar endpoint next to the gateway, and maybe show in the explorer when an admitted transaction has not reached the miner.
+
 ---
 
 ## What worked very well
@@ -75,4 +91,4 @@ await rpc(GW, 'eth_sendFrameTransaction', [rep.result.entry.tx]); // -> "prefix 
 - `ethrex_simulateFrameTransaction` and the explorer's **admission report** made every investigation quick.
 - `HegotaSupport` worked through an ERC-1167 clone (VERIFY frame, then the clone, the implementation and the APPROVE helper by `delegatecall`) on the first try.
 - EIP-8250 keyed nonces gave our hash-based wallet **protocol-enforced one-time keys**.
-- The faucet and gossip from gateway to miner were reliable all day.
+- The faucet was reliable all day, and so was the gateway to miner gossip until the evening (see 5).

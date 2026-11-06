@@ -4,13 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>QRAC.me · Frame transactions</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" type="image/png" href="assets/brand/favicon-32.png">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/user.css">
+  <script>try{if((localStorage.getItem('qrac.v1.uimode')||'user')==='user')document.documentElement.classList.add('pre-user')}catch(e){}</script>
+  <style>html.pre-user body:not(.mode-dev) .dev-only{display:none}</style>
 </head>
-<body>
-<main class="wrap">
+<body data-page="frame">
+<main class="wrap dev-only">
   <header class="top">
-    <div class="brand"><b>QRAC.me</b><span class="muted">Post-quantum authorization for Ethereum accounts</span></div>
+    <div class="brand"><img src="assets/brand/logo-192.png" alt=""><b>QRAC.me</b><span class="muted">Post-quantum authorization for Ethereum accounts</span></div>
     <div class="row">
       <span id="netPill" class="pill">devnet: checking…</span>
       <a class="small" href="test.html" target="_blank">Self-test</a>
@@ -93,5 +96,6 @@
   </section>
 </main>
 <script type="module" src="js/frame-app.js"></script>
+<script type="module" src="js/user-mode.js"></script>
 </body>
 </html>

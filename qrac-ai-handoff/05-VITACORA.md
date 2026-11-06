@@ -554,3 +554,23 @@ Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.p
 | D-4.5 | **Project name: QRAC.me** (QR Accounts), website **https://qrac.me**. Changed in the website (titles, header, texts and messages), README, test guide, feedback, submission texts and pitch outline. The repo gained links to the site. | Decided · Done |
 | D-4.6 | **Not renamed, on purpose:** contract names (`QRACAccount`, `QRACFactory`, `QRACFrameAccount`, `QRACFrameFactory`) because they are deployed on Sepolia and the devnet; the signed domain strings (`QRAC.Authorization.v1`, `QRAC.FrameTx.v1`) and the key-derivation tags (`QRAC/v1/...`) because changing them would change what is signed and derived, breaking existing accounts and seeds; the file tags (`qrac: 'seed-v1'`, `authorization-v1`) so existing seed and journal files keep importing; the GitHub repository URL. | Decided |
 | D-4.7 | Pitch outline cleaned with the plain-language rule (no em-dashes), since it is the source for the slides. | Done |
+
+### 7 Nov 2026: Session 1, continued: brand, User mode and first pitch deck
+
+**General prompt:** create the logo (square) and a 16:9 cover, put the logo on the website, add a second, simpler way to use the same site (a switch between "Dev mode" and "User mode", wallet style, desktop only, keeping both networks), test it, and draft the pitch slides (8 at most).
+
+| # | Decision | Status |
+|---|---|---|
+| D-5.1 | **Brand:** a "Q" ring holding an atom, cyan to violet to pink on deep navy. Claude drew a first version from code; the team refined it into the final logo and cover, which are used **as delivered, only resized** (high-quality bicubic with the imaging built into Windows; the cover is center-cropped to exact 16:9, less than one pixel). Files in `apps/web/assets/brand/`: `logo-512.png`, `logo-192.png`, `favicon-32.png`, `cover-1280x720.png`, `cover-640x360.png`. The first version and its generator scripts were removed. Logo and favicon applied to every page, the README and the slides. | Done |
+| D-5.2 | **One site, two modes.** A switch at the top right (Dev / User), remembered per browser, User by default. User mode is a single wallet-style card with a short wizard per tab ("Today · Sepolia", "Future · EIP-8141"): key, wallet or devnet gas, create account, then balance with Send / Receive / Add funds and the live progress of each transaction. It has no logic of its own: the Dev mode code exposes its functions (`window.QRACAPI`, `window.QRACFAPI`) and User mode calls them, so both modes share the same seed, journal and accounts. Desktop only, no mobile layout. | Done · Verified (both tabs end to end on fresh origins) |
+| D-5.3 | **Frame transaction delivery:** submit to the miner sidecar (`https://altmempool.forshtat.com/rpc`) first, the gateway as a fallback, and hand the transaction to the other endpoint in the background. Receipts are read from the execution RPC. Same change in `tools/devnet.py`. | Done · Verified (signed to "On chain" in 43 s, block 9056, [`0xbe2c7995…a3560c3`](https://explorer.altmempool.wtf/tx/0xbe2c7995f3e19f6c3df6b9db99d9844f0f62fa27217438804683c4c82a3560c3)) |
+| D-5.4 | `deployments.json` is always fetched fresh (no browser cache), so a new endpoint or a devnet redeploy reaches every visitor at once. | Done |
+| D-5.5 | **Pitch deck, first version:** 8 slides (cover, problem, idea, working today, frame transactions, proof, one account for both eras, close), built from `docs/SUBMISSION.md` and the pitch outline, same palette as the logo, with speaker notes. | Done (first version, for review) |
+
+**Errors we hit in this step, and whose they were:**
+
+| Error we hit | Cause | Reported to them |
+|---|---|---|
+| Frame transactions admitted by the gateway but never mined (status "New"; the miner sidecar did not know the hash) | **Theirs:** gossip from the gateway to the miner stalled that evening | Yes (feedback item 5) |
+| After the fix, the browser still sent only to the gateway | **Ours:** a cached `deployments.json` without the miner endpoint (see D-5.4) | No |
+| User mode did not move to the next step after an action | **Ours:** the view skipped redrawing while busy | No |
