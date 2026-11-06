@@ -44,9 +44,19 @@ What QRAC does **not** claim: full privacy, MEV protection, compatibility with e
 
 | Phase | What | Status |
 |---|---|---|
-| **1 — MVP** | Shared PQ **verifier** contract · user **account** PoC (single PQ authority, calls and atomic batches, replay protection) · **dApp** in plain HTML/CSS/JS with no backend (signer state in `localStorage` plus a JSON backup download after each signature, developer mode) · tests, gas benchmark, local demo | In progress |
+| **1 — MVP** | Shared PQ **verifier** contract · user **account** PoC (single PQ authority, calls and atomic batches, replay protection) · **dApp** in plain HTML/CSS/JS with no backend (signer state in `localStorage` plus a JSON backup download after each signature, developer mode) · tests, gas benchmark, local demo | Verifier ✅ · Account ✅ · dApp in progress |
 | **2 — Mint** | On-chain **factory** so anyone can mint (deploy and initialize atomically) their own QRAC account from the dApp | Planned |
 | **3 — Frame transactions** | Native validation of **EIP-8141 frame transactions** (`VERIFY` frame → `APPROVE`), submitted through the **ERC-8421 alternative mempool** on the hackathon devnet. PQ verification needs more than the public mempool's 100k verification-gas budget, so the alt mempool is what makes it possible. | Planned |
+
+### Measured so far (local EVM, LMS H10/W4)
+
+| | |
+|---|---|
+| Post-quantum signature check | ~172k–220k gas · 2,508-byte signature |
+| Full account action (send, token transfer, 5-call batch, cancel, rotate) | ~285k–345k gas per transaction |
+| Tests | 44 passing, incl. RFC 8554 vectors on-chain and a simulated compromise of the deployer's ECDSA key |
+
+Details and methodology: [vitácora](qrac-ai-handoff/05-VITACORA.md).
 
 ## Repository layout
 
@@ -61,22 +71,24 @@ qrac-ai-handoff/    project brief, plan, acceptance criteria, pitch and the deci
 
 ## Getting started
 
-> Commands below are the target workflow and will be confirmed as the code lands.
+Requirements: a browser, [Remix IDE](https://remix.ethereum.org), a wallet with Sepolia test ETH, and [Python 3](https://www.python.org/downloads/). No Node.js, Foundry or Hardhat. On Windows, use the `py` launcher if `python` opens the Microsoft Store.
 
-Requirements: a browser, [Remix IDE](https://remix.ethereum.org), a wallet with Sepolia test ETH, and [Python 3](https://www.python.org/downloads/). No Node.js, Foundry or Hardhat.
+**Contracts (Remix, default compiler settings, solc 0.8.24 or later):**
 
-**Contracts:** open the files in `contracts/` in Remix, compile, and deploy to Sepolia through your wallet ("Injected Provider").
+1. Deploy `contracts/LMSVerifier.sol` once per chain. It is shared by every account.
+2. Deploy `contracts/QRACAccount.sol` with `verifier` = the address from step 1 and `initialPublicKey` = your 56-byte LMS public key (the dApp will generate it from your 24 words).
+3. Fund the account by sending ETH or tokens to its address. From then on, only PQ-signed authorizations submitted through `submit()` can move them.
 
-**dApp:** serve it locally (browsers block the key-generation worker on `file://`), then open http://localhost:8080:
+**dApp** *(Phase 1.3, in progress)*: serve it locally (browsers block the key-generation worker on `file://`), then open http://localhost:8080:
 
 ```bash
-python -m http.server 8080 --directory apps/web
+py -m http.server 8080 --directory apps/web
 ```
 
 **Tests and gas benchmark** (optional, local in-memory EVM):
 
 ```bash
-python -m venv .venv
+py -m venv .venv
 ```
 
 ```bash

@@ -163,3 +163,73 @@ Other figures: verifier runtime bytecode 2,438 bytes; Python key-tree generation
 #### Next
 
 Phase 1.2: the QRAC account contract (authorization encoding, nonce, epoch and consumed-leaf state, open or restricted submitter, validity window, atomic batches, root rotation and cancellation), with tests that include an attacker holding the deployer's EOA key.
+
+### 6 Nov 2026 — Session 1, continued: Phase 1.2 QRAC account
+
+**General prompt:** build the user account contract ("Safe-equivalent" PoC) on top of the verifier.
+
+#### Decisions
+
+| # | Decision | Status |
+|---|---|---|
+| D-1.22 | **Signed message format (v1):** `abi.encode(DOMAIN, chainId, account, epoch, nonce, leaf, kind, allowedSubmitter, validAfter, validUntil, payload)`, where `DOMAIN = keccak256("QRAC.Authorization.v1")`. The **account rebuilds these bytes itself** from the submitted fields, so a submitter cannot swap in different bytes. The full bytes are signed; there is no separate pre-hash. | Decided · Done |
+| D-1.23 | **Three action kinds.** `EXECUTE` = ordered batch of CALLs `{target, value, data, checkReturn}`. `ROTATE` = `(newPublicKey, nextEpoch)`. `CANCEL` = empty payload, consumes the nonce and nothing else. | Decided · Done |
+| D-1.24 | **One state-changing entry point, `submit()`.** No owner, admin, upgrade, module, `DELEGATECALL` or ECDSA path. The other functions are views, `receive()` (accepts funds only) and the ERC-721 / ERC-1155 receiver callbacks (pure, grant nothing). A test enforces this on the compiled ABI. | Decided · Done |
+| D-1.25 | **Order of operations:** check kind, epoch, nonce, submitter, validity window and unused leaf; verify the PQ signature; mark the leaf used and advance the nonce **before** any external call; then execute. A reentrancy lock blocks nested `submit()`. If the transaction reverts, nothing is consumed on-chain, but the signer must still treat that leaf as spent (D-0.8). | Decided · Done |
+| D-1.26 | **Batch rules:** 1 to 32 calls, all-or-nothing, calls to the account itself refused. Per-call **signed** `checkReturn` flag: when set, the call must return nothing or exactly `true` (ERC-20 style). Without it, a call is opaque: success means only "did not revert". Return data is never copied wholesale (protects against "return-data bombs"); revert reasons are truncated to 256 bytes. | Decided · Done |
+| D-1.27 | **Key rotation:** the next epoch must be exactly current + 1; the parameter set (LMS and LM-OTS types) is fixed for the account's lifetime; any key ever installed (fingerprint = keccak256 of the 56-byte public key) can never be installed again. The action nonce is **never reset**. | Decided · Done |
+| D-1.28 | The contract exposes `authorizationMessage(header, leaf, payload)` so the dApp can fetch the exact bytes to sign and cross-check its own encoding before signing. | Decided · Done |
+| D-1.29 | Phase 1 deploys the account directly through its constructor (`verifier`, `initialPublicKey`); the deployer gets no rights. Deployment costs about 1.54M gas. The Phase 2 factory (ERC-1167 clones) is expected to cut this sharply (to be measured). | Decided |
+| D-1.30 | **Known limit, enforced off-chain:** the contract cannot detect the same LMS key being used in two accounts, which would reuse one-time keys. The dApp's key derivation must give every account (and every epoch) its own, independent tree. | Decided (dApp to implement) |
+
+#### Evidence
+
+Command (from the repository root): `.venv\Scripts\python tools/run_tests.py` → **44 tests, all passing** (19 from Phase 1.1 + 25 account tests). All account tests use **real LMS signatures and the real verifier**; nothing is mocked except external tokens and targets.
+
+| Check | Result |
+|---|---|
+| Contract `authorizationMessage` matches the Python reference encoder byte for byte (all kinds, several payloads) | Pass |
+| ETH transfer authorized by PQ signature, delivered by an unrelated relayer EOA | Pass |
+| **Simulated ECDSA compromise:** the deployer/funder EOA sends valid transactions with random bytes, a valid signature from its own LMS key, or an empty signature, and calls non-existent functions: every attempt is refused and the funds stay | Pass |
+| Only `submit()` can change state (compiled ABI check) | Pass |
+| Replay refused; changes to recipient, amount, submitter, validity window, kind or leaf index invalidate the signature | Pass |
+| Signature for another chain ID or another account refused; two accounts keep independent state | Pass |
+| Restricted submitter: other EOAs refused, allowed EOA succeeds; consecutive actions through different, fresh EOAs need no owner change | Pass |
+| Expired and not-yet-valid authorizations refused; the same signed bytes succeed once the window opens (exact retry, no re-signing) | Pass |
+| A leaf already used on-chain is refused, even for a new nonce | Pass |
+| A failed batch reverts everything (target, nonce, leaf); a replacement with a fresh leaf and the same nonce succeeds; the failed original can never succeed afterwards | Pass |
+| Two competing authorizations for the same nonce: only the first lands | Pass |
+| Cancel consumes the nonce and invalidates a pending action; a cancel with a payload is refused | Pass |
+| Rotation: epoch +1, nonce not reset, old key and old-epoch authorizations refused, new key works; reinstalling a past key, changing the parameter set or skipping an epoch is refused | Pass |
+| Bad constructor keys (wrong length, unsupported types) refused | Pass |
+| ERC-20 transfer + approve + revoke in one atomic batch; a false-returning token is refused when checked; a no-return token is accepted when checked | Pass |
+| Self-call, empty batch and 33-call batch refused; a 100 KB revert-data bomb is truncated to 256 bytes | Pass |
+| Re-entrant `submit()` from a called contract is blocked | Pass |
+| NFT received through `safeTransferFrom` (no state change, no authority) and sent out by an authorized call | Pass |
+
+#### Measurements (LMS H10/W4, total transaction gas including the 21k base and calldata)
+
+Measured on the local py-evm chain. Each run uses fresh random keys, so figures vary by roughly ±30k between runs (the signature check alone ranges 172k–220k, see Phase 1.1). These are first-use figures: they include writing storage slots from zero (nonce, leaf bitmap), which costs more than later actions.
+
+| Action | Gas (one run) | Calldata bytes |
+|---|---|---|
+| Deploy LMSVerifier (once per chain) | 580,446 | 2,466 (code) |
+| Deploy QRACAccount | 1,539,374 | 7,134 (code) |
+| Send ETH (1 call) | 324,773 | 3,108 |
+| ERC-20 transfer (1 call) | 312,833 | 3,204 |
+| Batch of 5 calls | 335,393 | 4,164 |
+| Cancel nonce | 286,934 | 2,852 |
+| Rotate key | 312,565 | 3,012 |
+
+Takeaway: a QRAC action costs about **285k–345k gas**, of which roughly two thirds is the post-quantum signature check. Extra calls in a batch are cheap compared with the fixed verification cost.
+
+#### Files produced
+
+- `contracts/QRACAccount.sol`: the account (includes the `ILMSVerifier` interface, so it deploys from Remix as a single file next to `LMSVerifier.sol`).
+- `contracts/test/Mocks.sol`: test-only tokens, targets, re-entrancy attacker, NFT.
+- `tools/qrac/authorization.py`: reference encoder for the signed message and payloads.
+- `tools/tests/test_account_evm.py`: account test suite and gas report.
+
+#### Next
+
+Phase 1.3: the dApp (HTML + CSS + JS, no backend): 24-word seed, key-tree generation in a browser worker, signer journal (localStorage + JSON download after every signature), compose → review → sign → submit through the connected wallet, and account status. The browser signer must reproduce the Python reference and the contract's `authorizationMessage` byte for byte.
