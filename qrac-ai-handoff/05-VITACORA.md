@@ -425,3 +425,44 @@ Team: on Sepolia, Setup → "Deploy factory" (one time), then mint an account an
 | 1 — MVP (verifier, account, dApp) | ✅ local + Sepolia |
 | 2 — Mint (factory, minimal-proxy accounts) | ✅ local + Sepolia |
 | 3 — EIP-8141 frame transactions + ERC-8421 alternative mempool | Next. Needs the hackathon devnet details (RPC, explorer, faucet, submission method, staking registry) from the alt-mempool team. |
+
+### 7 Nov 2026 — Session 1, continued: Phase 3 research (frame transactions + alternative mempool)
+
+**General prompt:** read the prize description and the alt-mempool material (docs.altmempool.wtf, devnet guide, `mempool-workshop`, `mempool-workshop-sidecar`, ethrex `eip8141-tracer`, explorer) and decide whether we have everything needed.
+
+#### What we now know (checked against the live devnet on 7 Nov 2026)
+
+| Topic | Finding |
+|---|---|
+| Devnet | Chain ID **1337**, ethrex `v23.0.0-eip8141-tracer-9aa3645d` (live, ~7,900 blocks, 60M gas blocks, 6 s). Execution RPC `https://altmempool.forshtat.com`; **sidecar (alt mempool) RPC** `https://altmempool.forshtat.com/rpc`; explorer `https://explorer.altmempool.wtf/`. Throwaway network: may be reset. |
+| Funding | **No faucet.** A shared genesis key is published in the sidecar repo (`deploy/devnet/genesis.values.env`); the workshop uses it once to fund a freshly generated key. Never stake from the shared key. |
+| Submitting | `eth_sendFrameTransaction` on the sidecar with the transaction as JSON. Status: `skandha_frameTransactionStatus`; receipts: `eth_getFrameTransactionReceipt`; gas: `eth_estimateFrameTransactionGas`; dry run with validation trace: `ethrex_simulateFrameTransaction` (raw RLP); admission report via the explorer API. |
+| Transaction format | Type `0x06`, RLP of `[chainId, nonceKeys, nonceSeq, sender, frames, signatures, fees, blobVersionedHashes, recentRootReferences]`; frame `[mode, flags, target, [execGas, stateGas], value, data]`; signature `[scheme, signer, msg, signature]`. **Signature hash** = keccak256 of the encoding with the `signature` bytes of every empty-`msg` entry set to empty (devnet codec). Scheme `0` = ARBITRARY (the account's code verifies it). |
+| New opcodes from plain Solidity | `HegotaSupport` (npm `@forshtat/hegota-support@0.0.1`, MIT): one tiny Yul helper contract per opcode, deployed by the inheriting contract's constructor; `approve(scope)` runs through `delegatecall`, so APPROVE acts on the account itself. Works with standard solc 0.8.28; a solc fork with native builtins exists but is untested. |
+| Validation rules (ERC-8421 draft as implemented) | Verification gas per entity: **100,000 unstaked / 1,000,000 staked** (BUDGET-010). SHA-256 precompile allowed (CALLING-040). Own storage always readable (STORAGE-010). **TIMESTAMP/NUMBER banned** in validation; GAS only right before a CALL; out-of-gas reverts forbidden; calls only to addresses with code; VERIFY frames are static (no storage writes). |
+| Staking | `NaiveStakingRegistry` at `0xd51c04d7a0b01124e84de152f4e56d9eecb22d2f`; `addStake(86400)` with value **> 0.01 ETH** (devnet minStake); keyed off `msg.sender`, so the account itself must call it. |
+| Keyed nonces (EIP-8250) | `nonceKeys` (1–16) + `nonceSeq`; each key's sequence lives in the NONCE_MANAGER predeploy (`0x…8250`), starts at 0 and advances when used. Keyed transactions do not touch the ordinary nonce. |
+| **Measured on the devnet** (read-only `eth_call`, `tools/devnet_verify_bench.py`) | RFC 8554 Test Case 2 verifies `true` on chain 1337; **LMS verify gas 182,603–208,813**, identical to the local numbers. Deployment estimates: LMSVerifier 4.13M gas, QRACFactory + implementation 13.12M (block limit 60M). |
+
+#### Decisions for Phase 3
+
+| # | Decision | Status |
+|---|---|---|
+| D-3.1 | **Prize category (a):** a PQ-secure smart wallet whose validation needs ~200k gas, impossible in the public mempool (100k) and for unstaked senders, admitted by the alt mempool once the account is **staked** (1M budget). Backed by the devnet measurement above. | Decided |
+| D-3.2 | **The account validates frame transactions natively:** a VERIFY-frame entry in `QRACAccount` reads the transaction's signature hash (`TXPARAM SIG_HASH`) and our LMS signature from an **ARBITRARY signature entry** (`SIGDATACOPY`), verifies it with the shared `LMSVerifier`, then calls `APPROVE(EXECUTION_AND_PAYMENT)`. Execution happens in ordinary SENDER frames (sends, token calls, batches): no custom execution code needed. Built on vendored `HegotaSupport` (MIT). | Decided (to implement) |
+| D-3.3 | **One-time-key safety enforced by the protocol through keyed nonces:** each frame transaction uses exactly one nonce key derived from (epoch, LMS leaf) with `nonceSeq = 0`; the VERIFY frame checks it. The protocol then guarantees a one-time key can authorize at most one transaction, with no storage write during validation (which static VERIFY frames forbid). | Decided (to implement) |
+| D-3.4 | **Bootstrapping the stake without breaking any rule:** the account stakes itself through its existing Phase 1 path, a normal transaction calling `submit()` with an EXECUTE that calls `addStake(86400)` with value. A staking *frame* transaction would itself need ~200k validation gas while still unstaked and be refused. "The same account works with today's transactions and with frame transactions." | Decided |
+| D-3.5 | No `TIMESTAMP` in the VERIFY path (banned); expiry can later use the protocol's expiry-verify frame. | Decided |
+| D-3.6 | **Tooling stays Python + browser (no Node.js required):** Python builds, signs (LMS) and submits frame transactions to the sidecar, reusing our reference code (`rlp` and keccak are already installed); the dApp can later do the same in the browser (sidecar CORS is open). The workshop's Node/TypeScript code is used as the reference to match encodings. | Proposed |
+
+#### Still to verify on the devnet (needs a funded key)
+
+- APPROVE through the chain clone → implementation → helper (`delegatecall` twice); fallback is a standalone account if clones are not accepted.
+- `SIGDATACOPY` of a 2,508-byte ARBITRARY signature and its cost; total VERIFY gas (expected ~230k).
+- Whether `HegotaSupport` helpers in the implementation push the factory deployment above the 16.7M per-transaction cap (estimate today 13.1M without them); fallback is deploying the implementation separately.
+- Encodings (signature hash, keyed-nonce fields) via `ethrex_simulateFrameTransaction` before the first real submission.
+
+#### Needs from the team
+
+- **OK to use the devnet's published shared genesis key once**, only to fund a fresh QRAC devnet key (exactly what the workshop's step 1 does). It holds worthless devnet ETH; it is never used for staking and never on a real network.
+- Optional, on site: confirm with the alt-mempool team (Pierre, Alex) that a sender whose VERIFY frame uses `delegatecall` (clone + helpers) and a 2.5 KB ARBITRARY signature is in scope, and whether the devnet will be reset during the hackathon.
