@@ -1,0 +1,11 @@
+# Local test harness only (the dApp and the contracts do not need any of this).
+# Install:  py -m venv .venv  &&  .venv\Scripts\python -m pip install -r tools/requirements.txt
+# Note: install eth-tester WITHOUT the [py-evm] extra; that extra pins an old py-evm
+# whose dependency (safe-pysha3) does not build on Python 3.13 / Windows.
+py-solc-x==2.1.0
+eth-tester==0.14.0b1
+py-evm==0.12.1b1
+eth-abi
+eth-utils==6.0.0
+eth-keys==0.8.0
+ckzg==2.1.8

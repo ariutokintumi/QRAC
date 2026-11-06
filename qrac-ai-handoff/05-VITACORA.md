@@ -82,7 +82,7 @@ Status labels used below:
 
 | # | Question | Notes |
 |---|---|---|
-| O-1.1 | Final LMS parameters (tree height, Winternitz `w`) for the demo. | Trade-off: browser key-generation time vs. verification gas vs. signature size. Measure before fixing. |
+| O-1.1 | Final LMS parameters (tree height, Winternitz `w`) for the demo. | `w` resolved by measurement: W4 (D-1.17). Tree height H10 stays provisional until browser key generation is measured. |
 | O-1.2 | Where to record "leaf consumed" under EIP-8141, given that `VERIFY` frames cannot write storage. | Candidates: map the one-time-key index to an EIP-8250 nonce key (protocol enforces one use), or mark it in a following `SENDER` frame. Decide in Phase 3 with the devnet. |
 | O-1.3 | ~~Which testnet to use for the Phase 1 public demo.~~ | Resolved: Sepolia (D-1.16). |
 | O-1.4 | Exact devnet RPC, explorer, faucet and submission method for the alt mempool. | Obtain on site from the alt-mempool team. |
@@ -108,3 +108,58 @@ Status labels used below:
 | D-1.16 | **Public demo network for Phases 1–2: Sepolia.** Phase 3 uses the hackathon frame-transaction devnet and its alternative mempool. | Decided |
 
 Environment status: git 2.56 installed and configured. Python 3 still to be installed (the `python` command on the machine is only the Windows Store placeholder).
+
+### 6 Nov 2026 — Session 1, continued: Phase 1.1 PQ verifier
+
+**General prompt:** start development with the shared PQ verifier ("general logic contract").
+
+#### Decisions
+
+| # | Decision | Status |
+|---|---|---|
+| D-1.17 | **Parameter set for QRAC accounts: `LMS_SHA256_M32_H10` + `LMOTS_SHA256_N32_W4`** (RFC 8554). Chosen by measurement (table below): W8 costs more than 1M gas and is rejected; W2 saves execution gas but nearly doubles the signature (4,620 vs 2,508 bytes), which cancels the saving in calldata and makes frame transactions heavier. | Decided (H10 provisional, see O-1.1) |
+| D-1.18 | The verifier accepts **every RFC 8554 SHA-256 (n = m = 32) parameter set**, so the official RFC test vectors can be checked on-chain. The **account pins its own parameter set** inside its stored public key, so a different set cannot be substituted for an account. | Decided |
+| D-1.19 | The per-signature randomizer `C` is derived deterministically (RFC 8554 Appendix A). This reproduces the RFC's signature byte for byte. It is safe only because a one-time key never signs twice, which the signer journal must enforce (D-0.8). | Decided |
+| D-1.20 | The verifier is **stateless, ownerless and storage-free**, uses only the SHA-256 precompile, and returns `false` (never reverts) on malformed input. It compiles with **default Remix settings** (no `viaIR`); tested with solc 0.8.28, EVM target Cancun. | Decided · Done |
+| D-1.21 | Local harness: Python virtual environment with `py-solc-x` (compiler) and `eth-tester` + `py-evm` (in-memory EVM), pinned in `tools/requirements.txt`. `eth-tester` is installed **without** its `[py-evm]` extra, because that extra pins an old dependency that does not build on Python 3.13 / Windows. Use the `py` launcher on this machine (`python` points to the Windows Store placeholder). | Decided · Done |
+
+#### Evidence
+
+Command (from the repository root): `.venv\Scripts\python tools/run_tests.py` → **19 tests, all passing.**
+
+| Check | Result |
+|---|---|
+| RFC 8554 Test Cases 1 and 2 (HSS, two levels each) verify in the Python reference | Pass |
+| RFC Test Case 2 top tree (H10/W4) rebuilt from the published SEED and I: public key **and** signature reproduced byte for byte | Pass |
+| Every leaf of an H5 tree signs and verifies; a one-bit flip in **every** byte of the signature or public key is rejected; wrong lengths and an out-of-range leaf are rejected (Python) | Pass |
+| On-chain verifier accepts each LMS level of both RFC test cases and rejects a modified message | Pass |
+| On-chain verifier agrees with the Python reference on random messages (0 to 1,000 bytes), random leaves and boundary leaves (0, 1, 1022, 1023) | Pass |
+| On-chain verifier rejects bit flips in every signature region (leaf index, OTS type, C, chain values, LMS type, authentication path), public-key flips, extended or truncated messages and keys from another tree | Pass |
+| Malformed inputs (empty or short or long signature or key, leaf index out of range, unsupported types) return `false` without reverting | Pass |
+
+#### Measurements
+
+Environment: py-evm 0.12.1b1 (Cancun rules), solc 0.8.28, optimizer on (200 runs). Gas is the **execution gas of `verify()` alone**, measured with a probe contract (no transaction base cost, no calldata cost). 10 random 320-byte messages per row.
+
+| Parameter set | Signature size | Verify gas min / avg / max |
+|---|---|---|
+| **H10 / W4 (chosen)** | 2,508 bytes | **171,947 / 194,617 / 219,902** |
+| H10 / W2 | 4,620 bytes | 136,934 / 142,598 / 147,410 |
+| H10 / W8 | 1,452 bytes | 1,070,716 / 1,345,301 / 1,664,406 |
+
+Other figures: verifier runtime bytecode 2,438 bytes; Python key-tree generation for 1,024 one-time keys (H10/W4) about 0.45 s on the development machine.
+
+**Consequence for Phase 3:** PQ verification alone costs about 170k–220k gas, above both the public mempool's 100k verification budget and ERC-8421's 100k budget for unstaked entities, and well inside the 1M budget for **staked** entities. The QRAC account therefore needs the alternative mempool **with a staked sender**. This is exactly the prize's "verification budget higher than 100k" category, now backed by a measurement instead of an estimate.
+
+#### Files produced
+
+- `contracts/LMSVerifier.sol`: the shared verifier.
+- `contracts/test/GasProbe.sol`: test-only gas measurement helper.
+- `tools/qrac/lms.py`: Python reference LMS / LM-OTS (key generation, signing, verification, HSS verification for the RFC vectors).
+- `tools/qrac/evm.py`: local compile-and-run harness.
+- `tools/extract_rfc8554_vectors.py` and `tools/vectors/rfc8554.json`: RFC 8554 Appendix F test vectors.
+- `tools/tests/`: reference and on-chain test suites; `tools/run_tests.py` runs them all.
+
+#### Next
+
+Phase 1.2: the QRAC account contract (authorization encoding, nonce, epoch and consumed-leaf state, open or restricted submitter, validity window, atomic batches, root rotation and cancellation), with tests that include an attacker holding the deployer's EOA key.
