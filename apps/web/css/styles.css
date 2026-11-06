@@ -99,6 +99,10 @@ button.secondary { background: transparent; color: var(--accent); }
 button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
+details.advanced { margin: 16px 0 4px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+details.advanced summary { cursor: pointer; font-weight: 600; }
+details.advanced[open] summary { margin-bottom: 4px; }
+
 .words { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; margin: 10px 0; }
 .words span {
   font-family: var(--mono); background: var(--bg); border: 1px solid var(--border);

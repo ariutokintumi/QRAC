@@ -324,3 +324,28 @@ Manual Sepolia run with MetaMask (deploy verifier and account, then send, batch 
 #### Measurement from Sepolia
 
 Contract creation is far more expensive on Sepolia today than on the local Cancun-rules chain: the verifier used **3,978,048 gas** (580k locally), and a `QRACAccount` deployment is estimated at **10.6M gas** (1.54M locally). A full verification as a transaction is estimated at 259,739 gas. This strengthens the case for Phase 2's minimal-proxy factory.
+
+### 7 Nov 2026 — Session 1, continued: Phase 1 proven on Sepolia
+
+**General prompt:** the team completed the Sepolia run (deploy, fund, PQ-signed send) and asked for an independent check, the cause of a failed funding attempt, and the status.
+
+#### Outcome
+
+- **Phase 1 is proven end to end on a public testnet.** Account `0x1465133a13b0DB9f43e674c77291Bb88616f0143` was deployed and funded from the dApp. Then 0.001 ETH left it through `submit()`, authorized only by an **LMS hash-based (post-quantum) signature** with one-time key #0, while the ECDSA wallet merely paid the gas. Independent re-verification from raw chain data with the Python reference: signature valid, tampered copy invalid, nonce and key state updated, recipient credited. Full record: [`deployments/11155111.md`](../deployments/11155111.md).
+- **Sepolia gas (authoritative for live-network claims):** account deployment 10,527,434; PQ-signed send 506,958 (vs ~320k on the local Cancun-rules chain). Contract creation is the dominant cost, which Phase 2 (minimal-proxy factory) addresses.
+
+| # | Finding / decision | Status |
+|---|---|---|
+| F-2 | A 0.069 ETH funding attempt **never reached the chain** (wallet nonce sequence and balance of 0.985 ETH show it was not mined and not underfunded). Brave Wallet failed to broadcast and returned an error ethers could not classify ("could not coalesce error"). The identical code path succeeded with 0.02 ETH a minute later. Not a contract or amount issue. **Fix:** the dApp now shows the wallet's own nested error message for such errors. | Diagnosed · Fixed (message) · Verified |
+
+#### Open question raised by the team
+
+| # | Question | Notes |
+|---|---|---|
+| O-1.5 | Are the **policy options** (allowed submitter, validity window) needed for a personal account MVP? | The Safe analogy means "the account can do anything the owner wants", not multisig. Both options are already in the contract and tested. The decision is how much of them the dApp should expose. |
+
+#### Decision on O-1.5 (policy options)
+
+| # | Decision | Status |
+|---|---|---|
+| D-1.45 | QRAC is a **personal** account. The Safe reference means "the account can do whatever its owner wants", not multisig. The submitter restriction and validity window **stay in the contract** (already built and tested, negligible cost). In the dApp they are **hidden under a collapsed "Advanced options"** with defaults **anyone can submit** and **valid for 60 minutes**, so the normal flow is: build action → review → sign → submit. The review screen still shows both values before signing. Closes O-1.5. | Decided · Done · Verified in browser |

@@ -167,7 +167,8 @@
       <div class="row"><button id="btnAddCall" class="secondary">Add to batch</button></div>
       <h3>Batch (executed in order, all-or-nothing)</h3>
       <div id="batchList"><p class="muted small">No calls yet.</p></div>
-      <h3>Policy</h3>
+      <details class="advanced">
+      <summary>Advanced options <span class="muted small">(defaults: anyone can submit · valid for 60 minutes)</span></summary>
       <div class="grid">
         <div>
           <label for="submitPolicy">Who may submit</label>
@@ -180,6 +181,9 @@
         <div><label for="customSubmitter">Allowed submitter</label><input id="customSubmitter" placeholder="0x…" disabled></div>
         <div><label for="validMinutes">Valid for (minutes, 0 = no expiry)</label><input id="validMinutes" type="number" min="0" value="60"></div>
       </div>
+      <p class="small muted">The validity window stops a signed but forgotten action from executing much later. Restricting
+        the submitter means only that address can deliver the signed action (it still cannot change it).</p>
+      </details>
       <div class="row"><button id="btnReview">Review</button></div>
     </section>
 

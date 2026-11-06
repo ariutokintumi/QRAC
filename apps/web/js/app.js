@@ -49,7 +49,12 @@ function explain(e) {
     } catch { /* not an account error */ }
     try { return 'reverted: ' + E.AbiCoder.defaultAbiCoder().decode(['string'], '0x' + data.slice(10))[0]; } catch { /* raw */ }
   }
-  return e?.shortMessage || e?.reason || e?.message || String(e);
+  // Wallet errors that ethers cannot classify ("could not coalesce error") keep the wallet's own
+  // message nested inside; show that instead.
+  const inner = e?.error?.message || e?.info?.error?.message || e?.cause?.message || e?.payload?.error?.message;
+  const outer = e?.shortMessage || e?.reason || e?.message || String(e);
+  if (inner && /coalesce/i.test(outer)) return `wallet error: ${inner}`;
+  return outer;
 }
 async function guard(label, fn) {
   try {
