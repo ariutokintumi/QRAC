@@ -1,4 +1,4 @@
-# QRAC test guide
+# QRAC.me test guide
 
 How to test everything by hand, from the website. Also works as the script for the demo video. Each step says what you should see.
 
@@ -10,7 +10,7 @@ From the repository folder:
 py -m http.server 8080 --directory apps/web
 ```
 
-Open http://localhost:8080. Both modes run from here. If the site is already on a public domain, use that instead.
+Open http://localhost:8080. Both modes run from here. The same site is online at https://qrac.me, where you can follow the same steps.
 
 (Optional: `.venv\Scripts\python tools/devnode.py` serves the same dApp on port 8545 with an offline local chain, for the "Local dev node" option of the Sepolia page.)
 
@@ -38,7 +38,7 @@ This shows that an ECDSA wallet only delivers and pays, and that the account onl
 
 Click "Future Ethereum · EIP-8141 frame transactions (devnet)" at the top.
 
-Brave Wallet is not used on this page, on purpose. No wallet can sign EIP-8141 frame transactions yet, and QRAC does not need one: the post-quantum key in the dApp signs and the account pays its own gas. The only ECDSA key involved is a throwaway devnet "setup key" that the page creates to pay for minting, funding and the staking transaction. It has no rights over the account.
+Brave Wallet is not used on this page, on purpose. No wallet can sign EIP-8141 frame transactions yet, and QRAC.me does not need one: the post-quantum key in the dApp signs and the account pays its own gas. The only ECDSA key involved is a throwaway devnet "setup key" that the page creates to pay for minting, funding and the staking transaction. It has no rights over the account.
 
 1. Seed and setup wallet. The seed shows "loaded" (same seed as the Sepolia page; chain 1337 gets its own keys). Click "Create devnet setup key", then "Get devnet ETH (faucet)". After a few seconds the setup key shows 1.0 ETH. The faucet gives once per hour per address, and each new setup key is a new address.
 2. Your frame account. Account number 0 (or any number you have not used on this page in this browser). Click "Generate key tree", then "Mint account". The address shows "minted", "Public key matches seed: yes" and "not staked". Click "Fund" with 0.05.
@@ -55,9 +55,9 @@ Brave Wallet is not used on this page, on purpose. No wallet can sign EIP-8141 f
 
 This shows that with frame transactions the same kind of account needs no ECDSA at all, pays its own gas, and that the protocol enforces its one-time keys. The 250k-gas post-quantum check only fits in the alternative mempool.
 
-### On a public domain
+### On qrac.me (or any public domain)
 
-The site is static: upload the `apps/web` folder to any host with HTTPS. Browser data is kept per site, so on a new domain the seed and the journal start empty.
+The site is static (the `apps/web` folder). Browser data is kept per site, so on qrac.me the seed and the journal start empty even if you used the local version before.
 
 - New seed: Sepolia page, Setup, "Create new seed".
 - To keep using your existing accounts: Setup, "Import seed file…" (your `qrac-seed-….json`), then Manage, "Import journal…" (your latest `qrac-journal-….json`). The frame page uses the same seed and journal.

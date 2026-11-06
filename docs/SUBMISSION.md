@@ -2,6 +2,12 @@
 
 Copy-paste source for the submission form. Keep it in sync with what is really deployed.
 
+Links:
+- Website: https://qrac.me
+- Code: https://github.com/ariutokintumi/QRAC
+- PQ-signed transfer on Sepolia: https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c
+- PQ frame transaction admitted by the alternative mempool: https://explorer.altmempool.wtf/tx/0x2f414a944f74a803e5d3e59eb98e9bd56f2c0a6e87be9bcf5cfa42e65026f4f0
+
 ## 1. Short description (max 100 characters)
 
 Post-quantum accounts for Ethereum, working today and ready for EIP-8141 frame transactions.
@@ -10,17 +16,17 @@ Post-quantum accounts for Ethereum, working today and ready for EIP-8141 frame t
 
 ## 2. Description
 
-QRAC (QR Accounts) is a dApp that gives you a post-quantum Ethereum account today, on the current network, and that already works with EIP-8141 frame transactions for when Ethereum gets native account abstraction.
+QRAC.me (QR Accounts) is a dApp that gives you a post-quantum Ethereum account today, on the current network, and that already works with EIP-8141 frame transactions for when Ethereum gets native account abstraction.
 
 The problem: every normal Ethereum account is controlled by one ECDSA key. If that key leaks, or a quantum computer breaks it one day, everything in the account is gone, and changing that at the protocol level will take years.
 
-How QRAC works: you create a 24-word seed (256 bits, independent of any wallet). The dApp turns it into 1,024 one-time post-quantum keys (LMS / LM-OTS from RFC 8554, only hashes, nothing that a quantum computer breaks). You mint a small smart account (a 45-byte clone of shared logic, address known before it exists) whose only owner is the root of that key tree. To move funds, call a token, an NFT or any contract, or run a batch of calls, you sign the exact action with a one-time key. The account verifies that signature on-chain before doing anything. Any wallet can deliver it and pay the gas, but no wallet owns the account: the deployer's or funder's ECDSA key can't move a single wei. One-time keys are never reused (they are reserved before signing), a failed transaction never locks you out (sign a replacement with a fresh key), you can cancel a pending action, and you can rotate to a new key tree before the keys run out.
+How QRAC.me works: you create a 24-word seed (256 bits, independent of any wallet). The dApp turns it into 1,024 one-time post-quantum keys (LMS / LM-OTS from RFC 8554, only hashes, nothing that a quantum computer breaks). You mint a small smart account (a 45-byte clone of shared logic, address known before it exists) whose only owner is the root of that key tree. To move funds, call a token, an NFT or any contract, or run a batch of calls, you sign the exact action with a one-time key. The account verifies that signature on-chain before doing anything. Any wallet can deliver it and pay the gas, but no wallet owns the account: the deployer's or funder's ECDSA key can't move a single wei. One-time keys are never reused (they are reserved before signing), a failed transaction never locks you out (sign a replacement with a fresh key), you can cancel a pending action, and you can rotate to a new key tree before the keys run out.
 
 It runs on Sepolia today: a real transfer authorized only by a post-quantum signature, accounts minted through the factory (738k gas instead of 10.5M), and simulated attacks with a leaked deployer key all refused.
 
-The same account idea goes further with frame transactions. On the EIP-8141 devnet the QRAC account validates its own transactions in a VERIFY frame: the transaction carries only the post-quantum signature (zero ECDSA), the account approves and pays its own gas, and each one-time key is used as an EIP-8250 nonce key, so the network itself refuses to accept a key twice. The post-quantum check needs about 250k gas of validation. The public mempool refuses it (limit 100k) and the ERC-8421 alternative mempool accepts it, which is exactly what we show in the dApp side by side, with the explorer link of the admitted transaction.
+The same account idea goes further with frame transactions. On the EIP-8141 devnet the QRAC.me account validates its own transactions in a VERIFY frame: the transaction carries only the post-quantum signature (zero ECDSA), the account approves and pays its own gas, and each one-time key is used as an EIP-8250 nonce key, so the network itself refuses to accept a key twice. The post-quantum check needs about 250k gas of validation. The public mempool refuses it (limit 100k) and the ERC-8421 alternative mempool accepts it, which is exactly what we show in the dApp side by side, with the explorer link of the admitted transaction.
 
-The frame-ready contract is the same QRAC account plus native frame validation, so it works with today's transactions and with frame transactions. The goal is that the account you create now keeps its address and funds when the migration happens.
+The frame-ready contract is the same QRAC.me account plus native frame validation, so it works with today's transactions and with frame transactions. The goal is that the account you create now keeps its address and funds when the migration happens.
 
 Testnets only, not audited.
 

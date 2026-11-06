@@ -1,6 +1,6 @@
-# Feedback for the alt-mempool team: errors we hit while building QRAC
+# Feedback for the alt-mempool team: errors we hit while building QRAC.me
 
-QRAC (post-quantum smart account, ETHGlobal) built a frame-transaction wallet on the public devnet on **7 Nov 2026**. This page lists only the errors and surprises **we actually ran into** during development and testing, where the cause turned out to be on the devnet / sidecar / docs side, and how we worked around each one. Errors that were ours are not listed.
+QRAC.me (post-quantum smart account, ETHGlobal) built a frame-transaction wallet on the public devnet on **7 Nov 2026**. This page lists only the errors and surprises **we actually ran into** during development and testing, where the cause turned out to be on the devnet / sidecar / docs side, and how we worked around each one. Errors that were ours are not listed.
 
 Versions at the time: ethrex `v23.0.0-eip8141-tracer-9aa3645d`, sidecar `forshtat/mempool-workshop-sidecar@2e22ff0`, workshop `forshtat/mempool-workshop@bcfe02a`. The devnet may have been reset since; the hashes are examples, and any frame transaction reproduces the same behaviour.
 
@@ -37,7 +37,7 @@ await p.getBlock(8195, true);       // throws the same (block containing FRAME_T
 
 ## 2. Replay rejected with a misleading reason
 
-**What happened.** One of our security tests resubmits an already-mined QRAC frame transaction to the gateway. It was rejected (correct), but with:
+**What happened.** One of our security tests resubmits an already-mined QRAC.me frame transaction to the gateway. It was rejected (correct), but with:
 
 `prefix gas budget exceeded: 320100 > 100000 (MAX_VERIFY_GAS)`
 

@@ -1,13 +1,13 @@
-# QRAC — pitch outline and claim boundaries
+# QRAC.me pitch outline and claim boundaries
 
-Prepared 6 November 2026, updated 7 November 2026. QRAC stands for **QR Accounts**. This document is a script and slide-content proposal, not a rendered slide deck.
+Prepared 6 November 2026, updated 7 November 2026. QRAC.me stands for **QR Accounts** (website: https://qrac.me). This document is a script and slide-content proposal, not a rendered slide deck.
 
 ## ⭐ Wow factors (lead the presentation with these)
 
 Simple to say, backed by evidence. Status: ✅ **demonstrated** (link or test exists) · 🔜 **in progress / planned** (say "coming", never "done"). Update the status column before presenting.
 
 **Tagline:** *Your wallet key can leak. Your money stays put.*
-**One sentence:** QRAC is a personal Ethereum account that only obeys a post-quantum signature, live on Sepolia today, with no protocol upgrade needed.
+**One sentence:** QRAC.me is a personal Ethereum account that only obeys a post-quantum signature, live on Sepolia today, with no protocol upgrade needed.
 
 | # | Wow factor (on-slide words) | Why it lands | Evidence | Status |
 |---|---|---|---|---|
@@ -21,13 +21,13 @@ Simple to say, backed by evidence. Status: ✅ **demonstrated** (link or test ex
 | W8 | **Too strong for the public mempool, so we built for the next one.** | The PQ check is ~250k gas of validation. The EIP-8141 public mempool allows 100k, so it **rejects** our transaction; the ERC-8421 alternative mempool **admits** it. Same signed bytes, two verdicts, live. | Devnet: canonical rejection "prefix gas budget exceeds MAX_VERIFY_GAS"; alt mempool admitted, 17/17 checks, mined: [explorer](https://explorer.altmempool.wtf/tx/0x2f414a944f74a803e5d3e59eb98e9bd56f2c0a6e87be9bcf5cfa42e65026f4f0). | ✅ |
 | W10 | **A transaction with zero ECDSA in it.** | In frame mode the transaction carries only the post-quantum signature. No wallet signs it, nobody else pays: the account approves and pays its own gas. | Devnet frame txs: 1 ARBITRARY (LMS, 2,508 bytes) signature, 0 secp256k1; payer = the account. | ✅ |
 | W11 | **The protocol itself enforces our one-time keys.** | Each one-time key is an EIP-8250 nonce key: once used, the network refuses it, no storage write needed. A replay is stopped by Ethereum, not just by our code. | Live replay attempt rejected by ethrex: "Nonce mismatch: expected 1, got 0". | ✅ |
-| W12 | **One account, today and tomorrow.** | The same QRAC account works with today's ordinary transactions (it even stakes itself that way) and with frame transactions. A two-tab demo: "Current Ethereum · Sepolia" and "Future Ethereum · frame transactions". | dApp mode switch; account staked through `submit()` then used via frame txs. | ✅ |
+| W12 | **One account, today and tomorrow.** | The same QRAC.me account works with today's ordinary transactions (it even stakes itself that way) and with frame transactions. A two-tab demo: "Current Ethereum · Sepolia" and "Future Ethereum · frame transactions". | dApp mode switch; account staked through `submit()` then used via frame txs. | ✅ |
 | W9 | **Mint your quantum-safe account for a fraction of the cost.** | One-click "mint" through a factory: each user gets a tiny 45-byte account that shares the logic; you can even know your address before it exists. **Sepolia: 10.5M → 738k gas to create an account (≈ 14× cheaper)**: [mint tx](https://sepolia.etherscan.io/tx/0x5e4efac6b3d9b0139a1e1b4e37582fd2098b32ccd27828b07808ab80657b22ad), then a [PQ-signed send from the minted account](https://sepolia.etherscan.io/tx/0x09e85ab99e123a893d1d98e366019db7ac7e2dca8316267b1eb736a199b94165). 45-byte account, address known (and fundable) before minting; 77 tests. | ✅ |
 
 ### The 3-slide version (if time is short)
 
 1. **The problem in one line:** "Quantum computers (or a leaked key) break ECDSA, and ECDSA is the only lock on your Ethereum account." Visual: a key with a crack.
-2. **The trick:** "Put a post-quantum lock *inside* the account. Any wallet can carry the message, only the PQ key can sign it." Visual: PQ signer → any gas payer → QRAC account → apps. Show W1 tx link.
+2. **The trick:** "Put a post-quantum lock *inside* the account. Any wallet can carry the message, only the PQ key can sign it." Visual: PQ signer → any gas payer → QRAC.me account → apps. Show W1 tx link.
 3. **The demo:** give the attacker the wallet key (W2), watch it fail; then send with a fresh wallet (W3); show the Etherscan link (W1).
 
 ### Claim guardrails for the wow factors
@@ -53,7 +53,7 @@ The precise security claim is: under trustworthy enrollment, an uncompromised PQ
 
 **On-slide copy**
 
-- QRAC
+- QRAC.me
 - Post-quantum authorization. Existing EVM applications.
 - The transaction submitter delivers an instruction; the account verifies who authorized it.
 
@@ -83,7 +83,7 @@ The precise security claim is: under trustworthy enrollment, an uncompromised PQ
 
 - Original concept: every protocol integrates a QR signature guard.
 - Revised design: each user deploys an account that checks authorization before calling protocols.
-- Many existing contract-compatible applications need no custom QRAC integration.
+- Many existing contract-compatible applications need no custom QRAC.me integration.
 
 **Visual:** Before/after diagrams: many protocol integration arrows versus one account boundary.
 
@@ -201,7 +201,7 @@ The precise security claim is: under trustworthy enrollment, an uncompromised PQ
 
 **Evidence needed:** Reproducible demo script, transaction hashes where deployed, receipts, and relevant test output. Keep a recorded fallback.
 
-### 11. What the prototype proves—and what it does not
+### 11. What the prototype proves, and what it does not
 
 **On-slide copy**
 

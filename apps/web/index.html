@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>QRAC · QR Accounts</title>
+  <title>QRAC.me · QR Accounts</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 <main class="wrap">
   <header class="top">
-    <div class="brand"><b>QRAC</b><span class="muted">Post-quantum authorization for Ethereum accounts</span></div>
+    <div class="brand"><b>QRAC.me</b><span class="muted">Post-quantum authorization for Ethereum accounts</span></div>
     <div class="row">
       <span id="netPill" class="pill">Not connected</span>
       <a class="small" href="test.html" target="_blank">Self-test</a>
@@ -39,7 +39,7 @@
       <h2>Post-quantum seed (24 words)</h2>
       <div id="seedNone">
         <p class="muted">The seed is independent from any Ethereum wallet: 256 bits of fresh randomness, encoded as 24
-          BIP-39 words. It controls your QRAC accounts. Your gas-paying wallet does not.</p>
+          BIP-39 words. It controls your QRAC.me accounts. Your gas-paying wallet does not.</p>
         <div class="row">
           <button id="btnNewSeed">Create new seed (downloads a seed file)</button>
           <button id="btnShowImport" class="secondary">Type / paste 24 words</button>
@@ -62,7 +62,7 @@
           <button id="btnRevealSeed" class="secondary">Show words</button>
           <button id="btnForgetSeed" class="danger">Forget seed</button>
         </div>
-        <p class="small muted">The seed file is SECRET (whoever has it controls your QRAC accounts). To continue in
+        <p class="small muted">The seed file is SECRET (whoever has it controls your QRAC.me accounts). To continue in
           another browser you need the seed file <b>and</b> the latest journal (Manage tab).</p>
         <div class="words hidden" id="revealWords"></div>
       </div>
@@ -105,7 +105,7 @@
   <!-- ============================== ACCOUNT ============================== -->
   <div data-panel="account" class="hidden">
     <section class="panel">
-      <h2>QRAC account</h2>
+      <h2>QRAC.me account</h2>
       <div class="grid">
         <div>
           <label for="acctSelect">Local accounts on this chain</label>
@@ -268,7 +268,7 @@
     </section>
     <section class="panel">
       <h2>Danger zone</h2>
-      <div class="row"><button id="btnWipe" class="danger">Erase all QRAC data from this browser</button></div>
+      <div class="row"><button id="btnWipe" class="danger">Erase all QRAC.me data from this browser</button></div>
     </section>
   </div>
 

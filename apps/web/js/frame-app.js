@@ -1,4 +1,4 @@
-// QRAC on the EIP-8141 frame-transaction devnet (Phase 3). Separate page; the Sepolia app (app.js) is untouched.
+// QRAC.me on the EIP-8141 frame-transaction devnet (Phase 3). Separate page; the Sepolia app (app.js) is untouched.
 // Shares the seed, key derivation, LMS and the signer journal with it.
 import * as E from './eth.js';
 import { mnemonicToSeed } from './bip39.js';

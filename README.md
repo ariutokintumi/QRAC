@@ -1,8 +1,10 @@
-# QRAC (QR Accounts)
+# QRAC.me (QR Accounts)
 
 Post-quantum accounts for Ethereum that you can use today, and that already work with EIP-8141 frame transactions.
 
-QRAC is a dApp plus a few contracts. You create a 24-word seed, the dApp turns it into 1,024 post-quantum one-time keys (LMS, RFC 8554, hash based), and you mint a small smart account whose only owner is that post-quantum key. Your funds live in the account. To move them you sign the exact action with a one-time key, and the account checks that signature on-chain before doing anything.
+Website: **[qrac.me](https://qrac.me)**
+
+QRAC.me is a dApp plus a few contracts. You create a 24-word seed, the dApp turns it into 1,024 post-quantum one-time keys (LMS, RFC 8554, hash based), and you mint a small smart account whose only owner is that post-quantum key. Your funds live in the account. To move them you sign the exact action with a one-time key, and the account checks that signature on-chain before doing anything.
 
 - **Today (Sepolia):** any wallet can deliver your signed action and pay the gas, but no wallet owns the account. If the ECDSA key of that wallet leaks, or one day gets broken by a quantum computer, it still can't move a single wei out of your account.
 - **With frame transactions (EIP-8141 devnet):** the same idea without the ECDSA wallet. The transaction carries only the post-quantum signature, the account approves and pays its own gas, and the protocol itself makes sure each one-time key is used once. The post-quantum check needs about 250k gas of validation, which the public mempool refuses (limit 100k) and the ERC-8421 alternative mempool accepts.
@@ -13,7 +15,7 @@ Testnets only. Not audited.
 
 | What | Where |
 |---|---|
-| PQ-signed transfer from a QRAC account on Sepolia | [0x0538b564…abb5c](https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c) |
+| PQ-signed transfer from a QRAC.me account on Sepolia | [0x0538b564…abb5c](https://sepolia.etherscan.io/tx/0x0538b564be006bfb5d70cd8b0d1d2fa60045863fc53fa41ef6d60735005abb5c) |
 | Account minted through the factory on Sepolia (738k gas instead of 10.5M) | [records](deployments/11155111.md) |
 | PQ frame transaction admitted by the alternative mempool (all rules passed) | [explorer](https://explorer.altmempool.wtf/tx/0x2f414a944f74a803e5d3e59eb98e9bd56f2c0a6e87be9bcf5cfa42e65026f4f0) |
 | Same transaction rejected by the public mempool, attacks rejected live | [records](deployments/1337.md) |
@@ -24,7 +26,7 @@ Testnets only. Not audited.
 flowchart LR
   U[dApp: 24-word seed, 1,024 one-time PQ keys] -->|signs the exact action| A[Signed authorization]
   A --> G[Any wallet delivers it and pays gas]
-  G --> C[QRAC account: holds the funds]
+  G --> C[QRAC.me account: holds the funds]
   C -->|checks the PQ signature| V[Shared LMS verifier]
   C -->|normal calls| P[Tokens and apps]
 ```
@@ -40,11 +42,11 @@ In frame mode, steps 4 and 5 change: the signature goes inside the EIP-8141 tran
 
 ## Today and tomorrow, same account
 
-`QRACFrameAccount` is the normal QRAC account (unchanged) plus native frame-transaction validation. It works with today's transactions through `submit()`, and on the EIP-8141 devnet it validates frame transactions directly (the account even staked itself through `submit()` and then used frame transactions).
+`QRACFrameAccount` is the normal QRAC.me account (unchanged) plus native frame-transaction validation. It works with today's transactions through `submit()`, and on the EIP-8141 devnet it validates frame transactions directly (the account even staked itself through `submit()` and then used frame transactions).
 
 If that contract is deployed on a chain today, the same address and the same funds can keep working when frame transactions arrive. The condition is that the final EIP-8141 keeps the opcodes and parameters of the current devnet, because the account has no upgrade path (by design: nobody, not even us, can change it). The Sepolia accounts minted so far use the plain `QRACAccount`. They keep working through `submit()` in any case, but they will not validate frame transactions natively.
 
-What QRAC does not claim: privacy, MEV protection, compatibility with apps that only accept EOAs or ECDSA permits, or audited security.
+What QRAC.me does not claim: privacy, MEV protection, compatibility with apps that only accept EOAs or ECDSA permits, or audited security.
 
 ## Numbers
 
@@ -59,7 +61,7 @@ What QRAC does not claim: privacy, MEV protection, compatibility with apps that 
 
 ## Try it
 
-Run the site locally (or upload `apps/web` to any static host):
+Use it at [qrac.me](https://qrac.me), or run the same site locally:
 
 ```bash
 py -m http.server 8080 --directory apps/web

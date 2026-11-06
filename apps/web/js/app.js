@@ -1,4 +1,4 @@
-// QRAC dApp (Phase 1 PoC): plain ES modules, no build step, no backend.
+// QRAC.me dApp (Phase 1 PoC): plain ES modules, no build step, no backend.
 import * as E from './eth.js';
 import { loadWordlist, generateMnemonic, mnemonicToEntropy, mnemonicToSeed, normalizeMnemonic } from './bip39.js';
 import { deriveTree } from './derive.js';
@@ -97,7 +97,7 @@ function requireSeed() {
 }
 function requireAttached() {
   const a = currentAccount();
-  if (!a || !a.address) throw new Error('select a deployed QRAC account first (Account tab)');
+  if (!a || !a.address) throw new Error('select a deployed QRAC.me account first (Account tab)');
   return a;
 }
 async function chainNow() {
@@ -135,7 +135,7 @@ function downloadSeedFile() {
   const fp = $('seedFp').textContent;
   const out = {
     qrac: 'seed-v1',
-    warning: 'SECRET. Whoever has this file controls the QRAC accounts derived from it. Test networks only.',
+    warning: 'SECRET. Whoever has this file controls the QRAC.me accounts derived from it. Test networks only.',
     mnemonic: S.mnemonic,
     words: 24,
     bip39Passphrase: '',
@@ -173,7 +173,7 @@ $('fileSeed').onchange = (ev) => guard('Import seed file', async () => {
   let m = text;
   if (text.startsWith('{')) {
     const data = JSON.parse(text);
-    if (data.qrac !== 'seed-v1' || !data.mnemonic) throw new Error('not a QRAC seed file');
+    if (data.qrac !== 'seed-v1' || !data.mnemonic) throw new Error('not a QRAC.me seed file');
     m = data.mnemonic;
   }
   ev.target.value = '';
@@ -186,7 +186,7 @@ $('btnRevealSeed').onclick = () => {
   else renderWords(el, S.mnemonic);
 };
 $('btnForgetSeed').onclick = () => {
-  if (!confirm('Remove the 24 words from this browser? Without them (or a backup) you lose control of your QRAC accounts.')) return;
+  if (!confirm('Remove the 24 words from this browser? Without them (or a backup) you lose control of your QRAC.me accounts.')) return;
   J.forgetMnemonic();
   location.reload();
 };
@@ -445,7 +445,7 @@ $('btnMint').onclick = () => guard('Mint', async () => {
   const f = factoryContract(S.signer);
   const predicted = await f.predictAddress(pk);
   if (!(await f.isMinted(pk))) {
-    log('Minting your QRAC account… confirm in your wallet. The minting wallet gets no rights over it.');
+    log('Minting your QRAC.me account… confirm in your wallet. The minting wallet gets no rights over it.');
     const tx = await f.mint(pk);
     const r = await tx.wait();
     log(`Minted ${predicted} in block ${r.blockNumber}, gas used ${r.gasUsed} (tx ${tx.hash}).`);
@@ -479,7 +479,7 @@ async function attach(address) {
       acc.locked = 'the account has on-chain activity that this browser\'s journal does not know about. Import your latest journal (Manage tab).';
     }
   });
-  log(`Attached QRAC account ${address}`);
+  log(`Attached QRAC.me account ${address}`);
   renderAccountSelect();
   await refresh();
 }
@@ -782,7 +782,7 @@ $('btnExportAuth').onclick = () => {
 
 $('btnSubmitImported').onclick = () => guard('Submit pasted authorization', async () => {
   const data = JSON.parse($('authImport').value);
-  if (data.qrac !== 'authorization-v1') throw new Error('not a QRAC authorization');
+  if (data.qrac !== 'authorization-v1') throw new Error('not a QRAC.me authorization');
   if (String(data.chainId) !== S.chainId) throw new Error(`authorization is for chain ${data.chainId}, connected to ${S.chainId}`);
   const own = J.loadJournal().log.find((x) => x.account === data.account && x.signature === data.signature);
   await submitAuthorization(data, own?.id);
@@ -820,7 +820,7 @@ $('fileJournal').onchange = (ev) => guard('Import journal', async () => {
 });
 $('btnWipe').onclick = () => {
   if (!confirm('Erase the 24 words, the journal and all cached data from this browser?')) return;
-  if (!confirm('Really? Without a backup of your words and journal you lose control of your QRAC accounts.')) return;
+  if (!confirm('Really? Without a backup of your words and journal you lose control of your QRAC.me accounts.')) return;
   J.wipeAll();
   location.reload();
 };

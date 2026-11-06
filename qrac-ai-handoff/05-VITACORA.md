@@ -544,3 +544,13 @@ Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.p
 | D-4.2 | **Honest scope of "same account after the migration":** `QRACFrameAccount` works today through `submit()` and validates frame transactions natively on the devnet, so the same address and funds can keep working when frame transactions ship, **provided the final EIP-8141 keeps the devnet's opcodes and parameters** (no upgrade path, by design). The accounts minted so far on Sepolia are plain `QRACAccount`: they keep working through `submit()` after the migration but do not validate frame transactions natively. A frame-ready factory on Sepolia is feasible today (estimates: implementation 15.28M gas, factory 1.85M, under the 16.7M per-transaction cap). | Decided (Sepolia frame-ready deployment pending the team's go-ahead) |
 | D-4.3 | Writing style for everything public: plain sentences, no em-dashes, little bold, the team's own tone. Applied to the README (rewritten), the website texts, `docs/` and `deployments/`. | Done |
 | D-4.4 | Form answers kept in [`docs/SUBMISSION.md`](../docs/SUBMISSION.md) (also the source for the slides). AI usage stated as it happened (Gemini research, ChatGPT planning, Claude Code development), plus the planned use for slides. | Done |
+
+### 7 Nov 2026: Session 1, continued: project name QRAC.me
+
+**General prompt:** the project is now called QRAC.me, with its own domain (qrac.me) where the website will be published. Update the name everywhere it is needed; the team already updated the form descriptions.
+
+| # | Decision | Status |
+|---|---|---|
+| D-4.5 | **Project name: QRAC.me** (QR Accounts), website **https://qrac.me**. Changed in the website (titles, header, texts and messages), README, test guide, feedback, submission texts and pitch outline. The repo gained links to the site. | Decided · Done |
+| D-4.6 | **Not renamed, on purpose:** contract names (`QRACAccount`, `QRACFactory`, `QRACFrameAccount`, `QRACFrameFactory`) because they are deployed on Sepolia and the devnet; the signed domain strings (`QRAC.Authorization.v1`, `QRAC.FrameTx.v1`) and the key-derivation tags (`QRAC/v1/...`) because changing them would change what is signed and derived, breaking existing accounts and seeds; the file tags (`qrac: 'seed-v1'`, `authorization-v1`) so existing seed and journal files keep importing; the GitHub repository URL. | Decided |
+| D-4.7 | Pitch outline cleaned with the plain-language rule (no em-dashes), since it is the source for the slides. | Done |
