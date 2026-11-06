@@ -1,4 +1,4 @@
-# QRAC — Vitácora (decision log)
+# QRAC vitácora (decision log)
 
 Running, human-readable record of how the project evolved: the general direction at each stage, the decisions taken and the outcomes produced. It records **decisions and results only**. Code, tests and other artifacts live in the repository and are referenced from here.
 
@@ -13,7 +13,7 @@ Status labels used below:
 
 ---
 
-## Stage 0 — Origin (before 6 Nov 2026)
+## Stage 0: Origin (before 6 Nov 2026)
 
 ### 0.1 Initial research in Gemini
 
@@ -41,9 +41,9 @@ Status labels used below:
 
 ---
 
-## Stage 1 — Development in Claude Code (Opus 5.5, high effort)
+## Stage 1: Development in Claude Code (Opus 5.5, high effort)
 
-### 6 Nov 2026 — Session 1: kickoff
+### 6 Nov 2026: Session 1: kickoff
 
 **General prompt:** read the handoff package, rename the project, set up the decision log and the README, define the development roadmap and start the MVP.
 
@@ -67,9 +67,9 @@ Status labels used below:
 
 | Phase | Scope | Status |
 |---|---|---|
-| **1 — MVP** | 1.1 PQ verifier contract (general logic). 1.2 User account PoC ("Safe-equivalent", single PQ authority, CALL and atomic batch, replay protection). 1.3 dApp (HTML/CSS/JS, signature generation, localStorage + JSON download, developer mode). 1.4 Tests, gas benchmark, local demo script. | In progress |
-| **2 — Mint** | On-chain factory so any user can **mint** (deploy and initialize atomically) their own QRAC account from the dApp; root renewal and cancellation flows polished. | Planned |
-| **3 — Frame transactions / alt mempool** | QRAC account validates EIP-8141 frame transactions natively in a `VERIFY` frame and calls `APPROVE`. Submission through the ERC-8421 alternative mempool on the hackathon devnet, using a staked sender to get the larger verification budget. Qualifying evidence: link to an admitted tx on the devnet explorer and the code that submits it. | Planned |
+| **1. MVP** | 1.1 PQ verifier contract (general logic). 1.2 User account PoC ("Safe-equivalent", single PQ authority, CALL and atomic batch, replay protection). 1.3 dApp (HTML/CSS/JS, signature generation, localStorage + JSON download, developer mode). 1.4 Tests, gas benchmark, local demo script. | In progress |
+| **2. Mint** | On-chain factory so any user can **mint** (deploy and initialize atomically) their own QRAC account from the dApp; root renewal and cancellation flows polished. | Planned |
+| **3. Frame transactions / alt mempool** | QRAC account validates EIP-8141 frame transactions natively in a `VERIFY` frame and calls `APPROVE`. Submission through the ERC-8421 alternative mempool on the hackathon devnet, using a staked sender to get the larger verification budget. Qualifying evidence: link to an admitted tx on the devnet explorer and the code that submits it. | Planned |
 
 #### Facts gathered for Phase 3 (from the public drafts, to be re-checked on site)
 
@@ -95,7 +95,7 @@ Status labels used below:
 - `README.md` rewritten for the project.
 - Development environment check: git, Node.js and Foundry were not available on the development machine. Resolved by the toolchain decisions below.
 
-### 6 Nov 2026 — Session 1, continued: toolchain, license and network
+### 6 Nov 2026: Session 1, continued: toolchain, license and network
 
 **General prompt:** keep the tooling to the minimum; confirm license and demo network.
 
@@ -109,7 +109,7 @@ Status labels used below:
 
 Environment status: git 2.56 installed and configured. Python 3 still to be installed (the `python` command on the machine is only the Windows Store placeholder).
 
-### 6 Nov 2026 — Session 1, continued: Phase 1.1 PQ verifier
+### 6 Nov 2026: Session 1, continued: Phase 1.1 PQ verifier
 
 **General prompt:** start development with the shared PQ verifier ("general logic contract").
 
@@ -164,7 +164,7 @@ Other figures: verifier runtime bytecode 2,438 bytes; Python key-tree generation
 
 Phase 1.2: the QRAC account contract (authorization encoding, nonce, epoch and consumed-leaf state, open or restricted submitter, validity window, atomic batches, root rotation and cancellation), with tests that include an attacker holding the deployer's EOA key.
 
-### 6 Nov 2026 — Session 1, continued: Phase 1.2 QRAC account
+### 6 Nov 2026: Session 1, continued: Phase 1.2 QRAC account
 
 **General prompt:** build the user account contract ("Safe-equivalent" PoC) on top of the verifier.
 
@@ -234,7 +234,7 @@ Takeaway: a QRAC action costs about **285k–345k gas**, of which roughly two th
 
 Phase 1.3: the dApp (HTML + CSS + JS, no backend): 24-word seed, key-tree generation in a browser worker, signer journal (localStorage + JSON download after every signature), compose → review → sign → submit through the connected wallet, and account status. The browser signer must reproduce the Python reference and the contract's `authorizationMessage` byte for byte.
 
-### 6 Nov 2026 — Session 1, continued: Phase 1.3 dApp
+### 6 Nov 2026: Session 1, continued: Phase 1.3 dApp
 
 **General prompt:** build the dApp (HTML + CSS + JS, no backend, developer mode) to create, operate and manage a QRAC account.
 
@@ -302,7 +302,7 @@ Python suite after this phase: **46 tests, all passing** (adds BIP-39 official v
 
 Manual Sepolia run with MetaMask (deploy verifier and account, then send, batch and rotate), record the addresses and transaction hashes under `deployments/11155111/`. Then Phase 2: factory / mint.
 
-### 7 Nov 2026 — Session 1, continued: first Sepolia run, fixes
+### 7 Nov 2026: Session 1, continued: first Sepolia run, fixes
 
 **General prompt:** the team ran the dApp against Sepolia with Brave Wallet; report and fix what blocked the run, and make seed handling practical for hackathon tooling.
 
@@ -325,7 +325,7 @@ Manual Sepolia run with MetaMask (deploy verifier and account, then send, batch 
 
 Contract creation is far more expensive on Sepolia today than on the local Cancun-rules chain: the verifier used **3,978,048 gas** (580k locally), and a `QRACAccount` deployment is estimated at **10.6M gas** (1.54M locally). A full verification as a transaction is estimated at 259,739 gas. This strengthens the case for Phase 2's minimal-proxy factory.
 
-### 7 Nov 2026 — Session 1, continued: Phase 1 proven on Sepolia
+### 7 Nov 2026: Session 1, continued: Phase 1 proven on Sepolia
 
 **General prompt:** the team completed the Sepolia run (deploy, fund, PQ-signed send) and asked for an independent check, the cause of a failed funding attempt, and the status.
 
@@ -350,7 +350,7 @@ Contract creation is far more expensive on Sepolia today than on the local Cancu
 |---|---|---|
 | D-1.45 | QRAC is a **personal** account. The Safe reference means "the account can do whatever its owner wants", not multisig. The submitter restriction and validity window **stay in the contract** (already built and tested, negligible cost). In the dApp they are **hidden under a collapsed "Advanced options"** with defaults **anyone can submit** and **valid for 60 minutes**, so the normal flow is: build action → review → sign → submit. The review screen still shows both values before signing. Closes O-1.5. | Decided · Done · Verified in browser |
 
-### 7 Nov 2026 — Session 1, continued: Phase 2 factory ("mint your account")
+### 7 Nov 2026: Session 1, continued: Phase 2 factory ("mint your account")
 
 **General prompt:** add the presentation's "wow factors", then build the factory so each user mints a minimal account that reuses shared logic.
 
@@ -407,7 +407,7 @@ Per-action costs are within the run-to-run variation of the signature check (fre
 
 Team: on Sepolia, Setup → "Deploy factory" (one time), then mint an account and send. Record the factory address in `apps/web/deployments.json` and `deployments/11155111.md`, and the Sepolia mint gas in the pitch (W9). Then Phase 3.
 
-### 7 Nov 2026 — Session 1, continued: Phase 2 proven on Sepolia
+### 7 Nov 2026: Session 1, continued: Phase 2 proven on Sepolia
 
 **General prompt:** the team deployed the factory on Sepolia from the dApp, minted an account and sent a PQ-signed transaction; verify and record.
 
@@ -422,11 +422,11 @@ Team: on Sepolia, Setup → "Deploy factory" (one time), then mint an account an
 
 | Phase | Status |
 |---|---|
-| 1 — MVP (verifier, account, dApp) | ✅ local + Sepolia |
-| 2 — Mint (factory, minimal-proxy accounts) | ✅ local + Sepolia |
-| 3 — EIP-8141 frame transactions + ERC-8421 alternative mempool | Next. Needs the hackathon devnet details (RPC, explorer, faucet, submission method, staking registry) from the alt-mempool team. |
+| 1. MVP (verifier, account, dApp) | ✅ local + Sepolia |
+| 2. Mint (factory, minimal-proxy accounts) | ✅ local + Sepolia |
+| 3. EIP-8141 frame transactions + ERC-8421 alternative mempool | Next. Needs the hackathon devnet details (RPC, explorer, faucet, submission method, staking registry) from the alt-mempool team. |
 
-### 7 Nov 2026 — Session 1, continued: Phase 3 research (frame transactions + alternative mempool)
+### 7 Nov 2026: Session 1, continued: Phase 3 research (frame transactions + alternative mempool)
 
 **General prompt:** read the prize description and the alt-mempool material (docs.altmempool.wtf, devnet guide, `mempool-workshop`, `mempool-workshop-sidecar`, ethrex `eip8141-tracer`, explorer) and decide whether we have everything needed.
 
@@ -467,7 +467,7 @@ Team: on Sepolia, Setup → "Deploy factory" (one time), then mint an account an
 - **OK to use the devnet's published shared genesis key once**, only to fund a fresh QRAC devnet key (exactly what the workshop's step 1 does). It holds worthless devnet ETH; it is never used for staking and never on a real network.
 - Optional, on site: confirm with the alt-mempool team (Pierre, Alex) that a sender whose VERIFY frame uses `delegatecall` (clone + helpers) and a 2.5 KB ARBITRARY signature is in scope, and whether the devnet will be reset during the hackathon.
 
-### 7 Nov 2026 — Session 1, continued: Phase 3 built and proven on the frame-transaction devnet
+### 7 Nov 2026: Session 1, continued: Phase 3 built and proven on the frame-transaction devnet
 
 **General prompt:** fund a devnet key and build Phase 3, kept separate from the current version: the dApp starts with a choice between "Current Ethereum (Sepolia)" and "EIP-8141 frame transactions (devnet)", so the jury can see both the solution for today (with its tradeoffs) and the one for tomorrow. Nothing from Phases 1–2 may break.
 
@@ -506,11 +506,11 @@ Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.p
 
 | Phase | Status |
 |---|---|
-| 1 — MVP | ✅ local + Sepolia |
-| 2 — Mint | ✅ local + Sepolia |
-| 3 — EIP-8141 + ERC-8421 | ✅ devnet (scripts and browser): admitted and mined transactions with explorer links |
+| 1. MVP | ✅ local + Sepolia |
+| 2. Mint | ✅ local + Sepolia |
+| 3. EIP-8141 + ERC-8421 | ✅ devnet (scripts and browser): admitted and mined transactions with explorer links |
 
-### 7 Nov 2026 — Session 1, continued: feedback for the alt-mempool team, test guide
+### 7 Nov 2026: Session 1, continued: feedback for the alt-mempool team, test guide
 
 **General prompt:** determine whether the "bug" found in the browser run was ours or theirs, and list, for the alt-mempool team, **only the errors we actually hit** during development and tests, saying for each whether the cause was ours or theirs (no generic audit of their materials). Write a step-by-step guide to test everything manually from the website.
 
@@ -534,7 +534,7 @@ Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.p
 
 **Fresh-site check (public-domain scenario):** on a new origin (static server, empty browser storage) the guide's frame steps work end to end: new seed → setup key + faucet → mint → fund → sign (1 PQ / 0 ECDSA, VERIFY 251,128 gas) → public mempool rejected → alternative mempool admitted 17/17, mined in block 8429 ([`0xc3c2c834…787914`](https://explorer.altmempool.wtf/tx/0xc3c2c834e5b86fe0e147791439973a1188bfed879024b70f2753c14153787914)).
 
-### 7 Nov 2026 — Session 1, continued: submission texts and plain-language pass
+### 7 Nov 2026: Session 1, continued: submission texts and plain-language pass
 
 **General prompt:** prepare the ETHGlobal form answers around one message (a dApp that gives you post-quantum accounts today and is already compatible with EIP-8141 frame transactions, so the account can stay the same after the migration), and remove em-dashes and AI-sounding wording from the README, the website and the docs.
 
