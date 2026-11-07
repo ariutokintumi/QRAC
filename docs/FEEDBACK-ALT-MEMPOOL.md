@@ -11,6 +11,8 @@ Versions at the time: ethrex `v23.0.0-eip8141-tracer-9aa3645d`, sidecar `forshta
 | 3 | Our **unstaked** account (~255k validation gas) was **admitted**, although the docs say unstaked entities get 100k | The devnet sidecar does not enforce the per-entity budget (BUDGET-010) | None needed; we stake anyway and documented the difference |
 | 4 | The devnet guide says **"There is no faucet"** and to fund from the shared genesis key | The gateway does have a faucet (`skandha_explorer_faucet`), and the workshop uses it | Used the faucet (never needed the shared key) |
 | 5 | Frame transactions sent to the gateway were **admitted but never mined** (status stayed `New`) | The gateway did not pass them on to the miner sidecar, which did not know the hash | Submit to the miner sidecar first, the gateway only as a fallback |
+| 6 | A frame transaction admitted by the miner sidecar (17/17) ended **Cancelled**, "relayed 4 times without being included in a block" | Not visible from the outside (fees and nonce were fine, other frame transactions were being mined) | Signed again with the next one-time key; mined about two minutes later |
+| 7 | The gateway turned frame transactions away with **"IO error: No space left on device"** | The gateway node's disk was full | None needed: we submit to the miner sidecar first (item 5) |
 
 ---
 
@@ -83,6 +85,20 @@ Sending the same raw transaction to the miner sidecar got it mined within second
 **Our workaround.** The dApp and `tools/devnet.py` now submit to the miner sidecar first, fall back to the gateway, and also hand the transaction to the other endpoint in the background. Receipts are read from the execution RPC. The next full run went from signing to "On chain" in 43 seconds (block 9056).
 
 **Suggestion:** document the miner sidecar endpoint next to the gateway, and maybe show in the explorer when an admitted transaction has not reached the miner.
+
+## 6. Admitted, then cancelled without being mined
+
+**What happened.** While recording our demo (7 Nov 2026), a frame transaction sent to the miner sidecar was admitted (17/17 checks) and never mined. Later, `skandha_frameTransactionStatus` returned `"status": "Cancelled"` with `"reason": "relayed 4 times without being included in a block"`. Transaction `0x9abbf5abdb678963a870a060e29389cd9cd3cc9d75e93261be0b6ec1467df7f4`, sender `0xa9bd2a4D920746D039947c14c10E845Db97Ea3f3`, nonce key 1, sequence 0.
+
+What we checked: fees were 2 gwei (`maxFeePerGas` and `maxPriorityFeePerGas`) with a base fee of 7 wei; the account was freshly minted and funded; blocks around it were being produced and included other frame transactions (for example block 10000). The same flow signed with the next one-time key (nonce key 2) was mined in block 10041 about two minutes later (`0xf82a00630f0012057c32524476ecc3ac0a3e249a48b80f7bb933d1f5e9eace17`).
+
+**Suggestion:** when the miner gives up on a transaction, show the error it got when relaying it (if any) in the status and in the explorer.
+
+## 7. Gateway disk full
+
+**What happened.** In the explorer, the admission report of `0xf82a0063…ce17` as seen by the Gateway instance says "Turned away: Mempool admission" with `IO error: No space left on device While appending to file: /usr/app/data/userOps/000084.log: No space left on device`, and the status shows "Rejected". The same transaction, as seen by the Miner instance, is "On chain" with every rule passed. In the same period the gateway answered "Frame transaction not found" for our transactions.
+
+**Our workaround.** None needed: the dApp submits to the miner sidecar first (item 5), so users were not affected. Without that change, every submission through the gateway would have been turned away.
 
 ---
 

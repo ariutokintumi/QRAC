@@ -91,8 +91,8 @@ LMS / LM-OTS (RFC 8554), BIP-39, EIP-8141 frame transactions, ERC-8421 alternati
 - ChatGPT (Astra): turned the idea into the architecture brief, execution plan, acceptance criteria and pitch outline (the documents in `qrac-ai-handoff/`).
 - Claude Code (Claude Opus 5.5) in the Claude desktop app, for all the development: the Solidity contracts, the Python reference implementation and tests, the dApp, the local dev node and the devnet script; running tests and debugging; testing the dApp in the app's built-in browser; checking our Sepolia and devnet transactions from raw chain data; and drafting the README, docs, the decision log (vitácora) and these texts.
 - Claude also drafted the first logo and cover, the User mode design and the first version of the slides.
-- The team: the idea, the scope and product decisions, review of everything, the final logo and cover (refined from Claude's drafts), the Sepolia runs with Brave Wallet, the manual tests on the website, and the final wording.
-- Next: we plan to use Claude to help draft the demo video script. The recording is ours.
+- Claude also recorded and edited the demo video: it drove the site in Brave through the Claude browser extension (the team unlocked the wallet and confirmed every wallet request), captured the screen, cut it and wrote the English subtitles.
+- The team: the idea, the scope and product decisions, review of everything, the final logo and cover (refined from Claude's drafts), the Sepolia runs with Brave Wallet, the manual tests on the website, the voice-over of the demo video, and the final wording.
 
 ## 12. Frame Transactions (EF): how we use it
 
@@ -108,6 +108,8 @@ Feedback (errors we hit while building, and how we got around them):
 3. Our unstaked account (about 255k validation gas) was admitted, while the docs say unstaked senders get 100k. We stake anyway, so we follow the rule as written.
 4. The devnet guide says there is no faucet, but the gateway has one (`skandha_explorer_faucet`) and the workshop uses it. We used it too.
 5. One evening our frame transactions were admitted by the gateway but never mined: status stayed "New" and the miner sidecar answered "Frame transaction not found" for the same hash. Sending them to the miner sidecar (`https://altmempool.forshtat.com/rpc`) got them mined in seconds, so the dApp now submits there first and uses the gateway as a fallback. Listing that endpoint in the docs would help.
+6. While recording the demo, one frame transaction was admitted by the miner (17/17) and then cancelled: "relayed 4 times without being included in a block". Fees and nonce were fine; the next one, signed with the next one-time key, was mined two minutes later. Showing the relay error would help.
+7. At the same time the gateway turned transactions away with "IO error: No space left on device" (its disk was full). Our miner-first submission kept users unaffected.
 
 What worked very well: the simulation RPC and the explorer's admission report made debugging quick, HegotaSupport worked through our clones on the first try, and keyed nonces fit hash-based one-time keys perfectly.
 

@@ -1,0 +1,104 @@
+1
+00:00:00,600 --> 00:00:05,000
+QRAC.me: post-quantum accounts for Ethereum, working today and ready for EIP-8141.
+
+2
+00:00:05,900 --> 00:00:12,900
+This is QRAC.me in Brave. We start in Dev mode, where every step is visible.
+
+3
+00:00:13,607 --> 00:00:18,790
+We create a 24-word seed, saved as a file. It is never sent anywhere.
+
+4
+00:00:19,340 --> 00:00:25,457
+Brave Wallet connects on Sepolia. It only pays gas, with no control over the account.
+
+5
+00:00:26,007 --> 00:00:31,171
+From the seed: 1,024 one-time hash-based keys (LMS). This is the post-quantum part.
+
+6
+00:00:31,721 --> 00:00:39,171
+We mint the account through our factory. One confirmation, about 738k gas.
+
+7
+00:00:39,721 --> 00:00:47,171
+Then we fund it with 0.02 Sepolia ETH.
+
+8
+00:00:47,721 --> 00:00:57,171
+On Etherscan: our account is a contract, holding 0.02 ETH.
+
+9
+00:00:57,721 --> 00:01:03,171
+Now we send 0.001 ETH back to the Brave wallet.
+
+10
+00:01:03,721 --> 00:01:12,171
+The review checks that what we sign is, byte for byte, what the contract verifies.
+
+11
+00:01:12,721 --> 00:01:22,871
+Signed with one-time key #0. Brave just delivers it and pays the gas.
+
+12
+00:01:23,471 --> 00:01:29,071
+Etherscan: Brave sent the transaction, and the account paid out 0.001 ETH.
+
+13
+00:01:29,271 --> 00:01:34,771
+No ECDSA key can move these funds. Only the post-quantum key can.
+
+14
+00:01:35,421 --> 00:01:40,586
+Now the future: EIP-8141 frame transactions, on the public devnet.
+
+15
+00:01:41,136 --> 00:01:48,014
+A throwaway setup key gets devnet ETH. It only pays to create and fund the account.
+
+16
+00:01:48,564 --> 00:01:56,514
+Same seed, new keys for this chain. We mint the account and fund it.
+
+17
+00:01:57,114 --> 00:02:01,714
+We sign a frame transaction: one post-quantum signature, zero ECDSA.
+
+18
+00:02:01,914 --> 00:02:06,414
+The check needs about 250k gas, and the account pays its own gas.
+
+19
+00:02:07,064 --> 00:02:12,668
+The public mempool allows only 100k gas for validation. Rejected.
+
+20
+00:02:13,218 --> 00:02:18,577
+Each send uses a fresh one-time key, which is also an EIP-8250 nonce key.
+
+21
+00:02:19,127 --> 00:02:28,577
+The ERC-8421 alternative mempool admits it: 17 of 17 checks. Mined.
+
+22
+00:02:29,127 --> 00:02:37,577
+The explorer agrees: on chain, the account is the payer, every rule passed.
+
+23
+00:02:38,127 --> 00:02:45,577
+Same accounts in User mode: a simple wallet anyone can use.
+
+24
+00:02:46,127 --> 00:03:01,292
+Send, and every step shows live, from the signature to the block.
+
+25
+00:03:01,842 --> 00:03:06,292
+And on Sepolia, the account we made in Dev mode: 1,015 one-time keys left.
+
+26
+00:03:07,092 --> 00:03:14,292
+QRAC.me: post-quantum accounts for Ethereum, today. Try it at qrac.me.
+

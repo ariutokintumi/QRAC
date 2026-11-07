@@ -27,3 +27,6 @@ Thumbs.db
 
 # Phase 3 devnet state (throwaway devnet key, QRAC devnet LMS seed, journal)
 .devnet/
+
+# Demo video renders (large binaries, shared outside git)
+video/*.mp4

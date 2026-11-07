@@ -382,7 +382,8 @@ async function submitAlt(onStep = () => {}) {
   let checks = [];
   try { const rep = await rpc(admittedBy, 'skandha_explorer_getTransaction', [hash]); checks = rep?.admission?.checks || []; } catch { /* explorer API optional */ }
   const passed = checks.filter((c) => c.verdict === 'pass').length;
-  await J.updateEntry(S.entryId, { status: r && r.status === '0x1' ? 'confirmed' : 'reverted', block: r ? Number(r.blockNumber) : null });
+  // no receipt means the network never mined it (for example the devnet dropped it): that is not a revert
+  await J.updateEntry(S.entryId, { status: r ? (r.status === '0x1' ? 'confirmed' : 'reverted') : 'not mined', block: r ? Number(r.blockNumber) : null });
   $('fResult').innerHTML = `<dl class="kv">
     <dt>Alternative mempool</dt><dd><span class="pill ok">admitted</span> ${checks.length ? `${passed}/${checks.length} admission checks passed` : ''}</dd>
     <dt>On chain</dt><dd>${r ? `block ${Number(r.blockNumber)} · status ${r.status === '0x1' ? '<span class="pill ok">success</span>' : '<span class="pill bad">failed</span>'} · ${Number(r.gasUsed).toLocaleString()} gas` : 'not yet'}</dd>

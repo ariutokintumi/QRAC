@@ -585,3 +585,41 @@ Records: [`deployments/1337.md`](../deployments/1337.md). Tools: `tools/devnet.p
 | D-5.7 | Two Dev mode display fixes found in the review: the frame page now refreshes the setup key balance and the block number after each action (before, only on load), and the Sepolia page's "Your account address" line shows the account as on chain once it exists (it kept the text from before the mint). | Done · Verified locally |
 
 **Local run** (fresh browser storage): frame tab in User mode (key, faucet, create, send mined in block 9498, stake) and in Dev mode (sign, public mempool rejected, alternative mempool admitted 17/17, mined in block 9528); Sepolia tab with the local dev node in place of the wallet, in User mode (create, fund, send) and in Dev mode (review identical to the contract, sign, submit). Each mode showed the other's transactions. 101 Python tests OK. Sepolia and devnet contracts still live, and the submission transaction is still on chain (block 8082).
+
+### 7 Nov 2026: Session 1, continued: demo video
+
+**General prompt:** record the demo video (2 to 4 minutes, at least 720p, audio without music, English subtitles that the team reads as the voice-over), showing the browser: Dev mode first, then User mode, opening each transaction on Etherscan until it is confirmed.
+
+| # | Decision | Status |
+|---|---|---|
+| D-5.8 | **Demo video:** recorded in Brave with Brave Wallet, on a local copy of the site with the same files as qrac.me. Claude drove the site through the Claude browser extension; the team unlocked the wallet and confirmed every wallet request. Real transactions on Sepolia (shown on Etherscan) and on the EIP-8141 devnet (shown on the alt-mempool explorer). Screen captured with a small Windows script (no installs) and edited in the browser (WebCodecs and mp4-muxer): dead time cut or sped up, a zoom on each step, short English subtitles. Voice-over by the team, recorded in sync with a small local page and mixed in (AAC, gently compressed, no music). Output `video/qrac-demo.mp4` (3:15, 1920x1080, 86 MB, kept outside git), `video/qrac-demo.srt`, voice-over script in [`docs/VIDEO-SCRIPT.md`](../docs/VIDEO-SCRIPT.md). | Done · Verified (audio and video tracks decoded) |
+| D-5.9 | A frame transaction the network never mined is labelled "not mined" in the activity list, instead of "reverted". | Done · Verified locally |
+
+**Errors we hit while recording, and whose they were:**
+
+| Error we hit | Cause | Reported to them |
+|---|---|---|
+| A frame transaction admitted by the miner was cancelled after 4 relays without being mined | **Theirs** (cause not visible from outside) | Yes (feedback item 6) |
+| The gateway turned transactions away: "No space left on device" | **Theirs:** gateway disk full | Yes (feedback item 7) |
+| Brave Wallet refused a request: "The tab is not active" | Brave Wallet only accepts requests from the tab in front; our setup had another window in front | No (expected wallet behavior) |
+| The dropped transaction appeared as "reverted" | **Ours:** wrong label (see D-5.9) | No |
+
+### 7 Nov 2026: Session 1, closing
+
+**General prompt:** final check, commit, and close the project (the pitch deck stays open for a last review).
+
+| # | Decision | Status |
+|---|---|---|
+| D-6.1 | **Final check before closing:** qrac.me serves all 31 files byte-identical to the repo; Sepolia and devnet contracts live; the submission transaction still on chain (block 8082); 101 Python tests OK; no broken links in the docs; no em-dashes in the docs or the website. The AI tools answer now says that Claude recorded and edited the demo video and that the voice-over is the team's. | Done · Verified |
+
+#### Final status
+
+| Item | Status |
+|---|---|
+| Phase 1, MVP (Sepolia) | Done |
+| Phase 2, factory and minted accounts (Sepolia) | Done |
+| Phase 3, EIP-8141 frame transactions and ERC-8421 alternative mempool (devnet) | Done |
+| Website https://qrac.me (User mode and Dev mode) | Live |
+| Submission texts, feedback for the alt-mempool team, test guide | Done |
+| Logo, cover, pitch deck (first version) | Done; deck under the team's review |
+| Demo video with voice (3:15) | Done |
